@@ -11,3 +11,4 @@ for _ in range(5):
         print('Incorrect credentials, please check your input!')
     else:
         print('Welcome to Tax Management System!')
+        quit()
