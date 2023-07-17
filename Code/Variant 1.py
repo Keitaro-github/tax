@@ -13,7 +13,7 @@ if username != stored_username or password != stored_password:
 
     if username != stored_username or password != stored_password:
         print('Incorrect credentials, please check your input!')
-        username = input('Enter your usernC:\Users\serge\PycharmProjects\pythonProject\pet_projects\tax\CodeC:\Users\serge\PycharmProjects\pythonProject\pet_projects\tax\Codeame and press "Enter": ')
+        username = input('Enter your username and press "Enter": ')
         password = input('Enter your password and press "Enter": ')
 
         if username != stored_username or password != stored_password:
