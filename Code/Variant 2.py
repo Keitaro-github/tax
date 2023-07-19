@@ -10,8 +10,9 @@ while attempts < 5:
 
     username = input('Enter your username and press "Enter": ')
     password = input('Enter your password and press "Enter": ')
+    result = username == stored_username and password == stored_password
 
-    if username != stored_username or password != stored_password:
+    if result is False:
         print('Incorrect credentials, please check your input!')
         attempts += 1
 
