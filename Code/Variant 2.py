@@ -6,13 +6,17 @@ stored_password = "123456"
 attempts = 0
 attempts_limit = 5
 
-while attempts < 5:
 
+def sign_in():
     username = input('Enter your username and press "Enter": ')
     password = input('Enter your password and press "Enter": ')
-    result = username == stored_username and password == stored_password
+    if username != stored_username or password != stored_password:
+        return False
 
-    if result is False:
+
+while attempts < 5:
+
+    if sign_in() is False:
         print('Incorrect credentials, please check your input!')
         attempts += 1
 
