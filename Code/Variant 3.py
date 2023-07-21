@@ -12,7 +12,7 @@ def sign_in():
     password = input('Enter your password and press "Enter": ')
     if username == stored_username and password == stored_password:
         return True
-    elif username != stored_username or password != stored_password:
+    else:
         return False
 
 
