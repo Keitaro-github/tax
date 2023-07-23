@@ -7,25 +7,30 @@ attempts = 0
 attempts_limit = 5
 
 
-def validate_password():
-    password = input('Enter your password and press "Enter": ')
-    password_length = len(str(password))
+def validate_password(password):
+    password_length = len(password)
     password_digits_only = str.isdigit(password)
     password_alphabets_only = str.isalpha(password)
 
     if password_length <= 7:
-        return True and print('Too short password!')
-    elif password_digits_only:
-        return True and print('Password must contain letters!')
-    elif password_alphabets_only:
-        return True and print('Password must contain digits!')
+        print('Too short password!')
+        return False
+    elif password_digits_only is True:
+        print('Password must contain letters!')
+        return False
+    elif password_alphabets_only is True:
+        print('Password must contain digits!')
+        return False
+    else:
+        return True
 
-
-# validate_password()
 
 def sign_in():
     username = input('Enter your username and press "Enter": ')
     password = input('Enter your password and press "Enter": ')
+    # result = validate_password(password)
+    # if result is False:
+    #     return False
     if username == stored_username and password == stored_password:
         return True
     else:
