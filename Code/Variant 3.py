@@ -1,10 +1,18 @@
 # Credentials check program
 # Variant 3: "Range function"
 
-stored_username = "sergiy"
-stored_password = "123456"
+# stored_username = "sergiy"
+# stored_password = "123456"
 attempts = 0
 attempts_limit = 5
+users = [
+    {"username": "Keitaro", "password": "123456", 'ID': 1},
+    {"username": "Ivan", "password": "654321", 'ID': 2},
+    {"username": "Ben", "password": "999999", 'ID': 3},
+    {"username": "David", "password": "888888", 'ID': 4},
+    {"username": "Chris", "password": "777777", 'ID': 5},
+    {"username": "Gregor", "password": "666666", 'ID': 6}
+]
 
 
 def validate_password(password):
@@ -26,15 +34,13 @@ def validate_password(password):
 
 
 def sign_in():
-    username = input('Enter your username and press "Enter": ')
-    password = input('Enter your password and press "Enter": ')
-    # result = validate_password(password)
-    # if result is False:
-    #     return False
-    if username == stored_username and password == stored_password:
-        return True
-    else:
-        return False
+    username_input = input('Enter your username and press "Enter": ')
+    password_input = input('Enter your password and press "Enter": ')
+    for user in users:
+        if username_input == user['username'] and password_input == user['password']:
+            return True
+        else:
+            continue
 
 
 for _ in range(5):
