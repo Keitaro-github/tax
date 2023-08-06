@@ -39,10 +39,7 @@ def sign_in():
     for user in users:
         if username_input == user['username'] and password_input == user['password']:
             return True
-        elif username_input != user['username'] or password_input != user['password']:
-            continue
-        else:
-            return False
+    return False
 
 
 for _ in range(5):
