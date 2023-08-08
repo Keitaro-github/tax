@@ -15,6 +15,32 @@ users = [
 ]
 
 
+def show_list():
+    print('The list of users is as follows:')
+    for user in users:
+        print(user['username'])
+
+
+def add_user():
+    show_list()
+    while True:
+        print('***Exit registration with empty input')
+        username = input('Register your username and press "Enter": ')
+        if username.strip() == '':
+            break
+        password = input('Register your password and press "Enter": ')
+        if password.strip() == '':
+            break
+        id_num = input('Register your ID and press "Enter": ')
+        if id_num.strip() == '':
+            break
+        users.append({"username": username, "password": password, "ID": id_num})
+    show_list()
+
+
+add_user()
+
+
 def validate_password(password):
     password_length = len(password)
     password_digits_only = str.isdigit(password)
