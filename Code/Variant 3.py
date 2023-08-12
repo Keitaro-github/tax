@@ -12,46 +12,46 @@ users = [
 ]
 
 
-def delete_user_by_id(users):
-    while True:
-        print('Please enter user ID for deletion:')
-        try:
-            user_id_input = int(input())
-        except ValueError:
-            print('Invalid input. Please neter a valid user ID.')
-            continue
-        for user in users:
-            if user['user_id'] == user_id_input:
-                users.remove(user)
-                print(f'User with ID {user_id_input} has been deleted')
-                break
-            else:
-                print(f'User with ID {user_id_input} not found')
-                break
+def delete_user(id_num):
+    for user in users:
+        if user['user_id'] == id_num:
+            users.remove(user)
+            print(f'User with ID {id_num} has been deleted')
+            break
 
 
-delete_user_by_id(users)
+# delete_user(6)
+#
+#
+# def user_info_printout(users):
+#     while True:
+#         print('Please enter user ID for printout:')
+#         try:
+#             user_id_input = int(input())
+#         except ValueError:
+#             print('Invalid input. Please neter a valid user ID.')
+#             continue
+#         found = False
+#         for user in users:
+#             if user['user_id'] == user_id_input:
+#                 print(user)
+#                 found = True
+#                 break
+#         if not found:
+#             print(f'User with ID {user_id_input} not found')
+#
+#
+# user_info_printout(users)
 
+def find_user(user_name):
+    for user in users:
+        if user['username'] == user_name:
+            print(user_name)
+            return user
+    return None
 
-def user_info_printout(users):
-    while True:
-        print('Please enter user ID for printout:')
-        try:
-            user_id_input = int(input())
-        except ValueError:
-            print('Invalid input. Please neter a valid user ID.')
-            continue
-        found = False
-        for user in users:
-            if user['user_id'] == user_id_input:
-                print(user)
-                found = True
-                break
-        if not found:
-            print(f'User with ID {user_id_input} not found')
+result = find_user('Tom')
 
-
-user_info_printout(users)
 
 
 def show_list():
@@ -79,15 +79,17 @@ def validate_password(password):
 
 def add_user():
     show_list()
-    while True:
-        print('')
+    print('')
+    username = input('Register your username and press "Enter": ')
+    while find_user(username) is not None:
+        print('The name with this name is already registered, please provide another name')
         username = input('Register your username and press "Enter": ')
-        password = input('Register your password and press "Enter": ')
-        while not validate_password(password):
-            password = input('Please enter a valid password: ')
-        id_num = input('Register your ID and press "Enter": ')
-        if users.append({"username": username, "password": password, "ID": id_num}):
-            add_user()
+
+    password = input('Register your password and press "Enter": ')
+    while not validate_password(password):
+        password = input('Please enter a valid password: ')
+    id_num = input('Register your ID and press "Enter": ')
+    users.append({"username": username, "password": password, "ID": id_num})
 
 
 add_user()
