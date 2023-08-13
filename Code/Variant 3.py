@@ -17,19 +17,18 @@ def generate_id():
     for user in users:
         id_list.append(user['user_id'])
     if not id_list:
-        id_list.insert(0, 1)
+        return 1
     elif id_list[0] != 1:
-         id_list.insert(0, 1)
+        return 1
     else:
         for i in range(len(id_list) - 1):
             if id_list[i] == (id_list[i + 1] - 1):
                 continue
             else:
-                id_list.insert(i + 1, id_list[i] + 1)
-                break
+                return i + 2
         else:
-            id_list.append(len(id_list) + 1)
-    print(id_list)
+            list_number = len(id_list)
+            return list_number + 1
 
 
 generate_id()
@@ -73,8 +72,8 @@ def find_user(user_name):
             return user
     return None
 
-result = find_user('Tom')
 
+result = find_user('Tom')
 
 
 def show_list():
@@ -96,6 +95,12 @@ def validate_password(password):
     elif password_alphabets_only is True:
         print('Password must contain digits!')
         return False
+    elif password.islower() is True:
+        print('Password must contain uppercase letters!')
+        return False
+    elif password.isupper() is True:
+        print('Password must contain lowercase letters!')
+        return False
     else:
         return True
 
@@ -107,11 +112,10 @@ def add_user():
     while find_user(username) is not None:
         print('The name with this name is already registered, please provide another name')
         username = input('Register your username and press "Enter": ')
-
     password = input('Register your password and press "Enter": ')
     while not validate_password(password):
         password = input('Please enter a valid password: ')
-    id_num = input('Register your ID and press "Enter": ')
+    id_num = generate_id()
     users.append({"username": username, "password": password, "ID": id_num})
 
 
