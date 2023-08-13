@@ -12,6 +12,29 @@ users = [
 ]
 
 
+def generate_id():
+    id_list = []
+    for user in users:
+        id_list.append(user['user_id'])
+    if not id_list:
+        id_list.insert(0, 1)
+    elif id_list[0] != 1:
+         id_list.insert(0, 1)
+    else:
+        for i in range(len(id_list) - 1):
+            if id_list[i] == (id_list[i + 1] - 1):
+                continue
+            else:
+                id_list.insert(i + 1, id_list[i] + 1)
+                break
+        else:
+            id_list.append(len(id_list) + 1)
+    print(id_list)
+
+
+generate_id()
+
+
 def delete_user(id_num):
     for user in users:
         if user['user_id'] == id_num:
