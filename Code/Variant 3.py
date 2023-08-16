@@ -147,11 +147,13 @@ def validate_password(password):
 
 
 def change_password(input_username):
-    input_username = input("Enter your username: ")
     for user in users:
         if user['username'].lower() == input_username.lower():
-            input_old_password = input("Hello " + user['username'] + " enter your password: ")
-            if user['password'] == input_old_password:
+            input_old_password = input("Hello " + user['username'] + ", please enter your password: ")
+            if user['password'] != input_old_password:
+                print('Incorrect password entered. Process terminated.')
+                return False
+            elif user['password'] == input_old_password:
                 input_new_password1 = input("Please enter your new password: ")
                 while not validate_password(input_new_password1):
                     input_new_password1 = input('Please enter a valid password: ')
@@ -160,13 +162,9 @@ def change_password(input_username):
                     user['password'] = input_new_password2
                     print('Password updated successfully!')
                     return True
-            else:
-                if user['password'] != input_old_password:
-                    print('Incorrect password entered, please check your credentials!')
-                    change_password(input_username)
-    else:
-        print('Incorrect username entered, please check your credentials!')
-        return False
+                elif input_new_password1 != input_new_password2:
+                    print('Password is not the same. Procedure terminated.')
+                    return False
 
 
-change_password('username')
+change_password('ben')
