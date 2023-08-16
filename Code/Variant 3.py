@@ -12,35 +12,35 @@ users = [
 ]
 
 
-def generate_id():
-    id_list = []
-    for user in users:
-        id_list.append(user['user_id'])
-    if not id_list:
-        return 1
-    elif id_list[0] != 1:
-        return 1
-    else:
-        for i in range(len(id_list) - 1):
-            if id_list[i] == (id_list[i + 1] - 1):
-                continue
-            else:
-                return i + 2
-        else:
-            list_number = len(id_list)
-            return list_number + 1
-
-
-generate_id()
-
-
-def delete_user(id_num):
-    for user in users:
-        if user['user_id'] == id_num:
-            users.remove(user)
-            print(f'User with ID {id_num} has been deleted')
-            break
-
+# def generate_id():
+#     id_list = []
+#     for user in users:
+#         id_list.append(user['user_id'])
+#     if not id_list:
+#         return 1
+#     elif id_list[0] != 1:
+#         return 1
+#     else:
+#         for i in range(len(id_list) - 1):
+#             if id_list[i] == (id_list[i + 1] - 1):
+#                 continue
+#             else:
+#                 return i + 2
+#         else:
+#             list_number = len(id_list)
+#             return list_number + 1
+#
+#
+# generate_id()
+#
+#
+# def delete_user(id_num):
+#     for user in users:
+#         if user['user_id'] == id_num:
+#             users.remove(user)
+#             print(f'User with ID {id_num} has been deleted')
+#             break
+#
 
 # delete_user(6)
 #
@@ -65,21 +65,21 @@ def delete_user(id_num):
 #
 # user_info_printout(users)
 
-def find_user(user_name):
-    for user in users:
-        if user['username'] == user_name:
-            print(user_name)
-            return user
-    return None
-
-
-result = find_user('Tom')
-
-
-def show_list():
-    print('The list of users is as follows:')
-    for user in users:
-        print(user['username'])
+# def find_user(user_name):
+#     for user in users:
+#         if user['username'] == user_name:
+#             print(user_name)
+#             return user
+#     return None
+#
+#
+# result = find_user('Tom')
+#
+#
+# def show_list():
+#     print('The list of users is as follows:')
+#     for user in users:
+#         print(user['username'])
 
 
 def validate_password(password):
@@ -104,43 +104,69 @@ def validate_password(password):
     else:
         return True
 
+#
+# def add_user():
+#     show_list()
+#     print('')
+#     username = input('Register your username and press "Enter": ')
+#     while find_user(username) is not None:
+#         print('The name with this name is already registered, please provide another name')
+#         username = input('Register your username and press "Enter": ')
+#     password = input('Register your password and press "Enter": ')
+#     while not validate_password(password):
+#         password = input('Please enter a valid password: ')
+#     id_num = generate_id()
+#     users.append({"username": username, "password": password, "ID": id_num})
+#
+#
+# add_user()
+# show_list()
+#
+#
+# def sign_in():
+#     print('')
+#     username_input = input('Enter your username and press "Enter": ')
+#     password_input = input('Enter your password and press "Enter": ')
+#     for user in users:
+#         if username_input == user['username'] and password_input == user['password']:
+#             return True
+#     return False
+#
+#
+# for _ in range(5):
+#     if sign_in() is True:
+#         print('Welcome to Tax Management System!')
+#         break
+#
+#     else:
+#         print('Incorrect credentials, please check your input!')
+#         attempts = attempts + 1
+#
+# if attempts == attempts_limit:
+#     print("Oops, too many wrong attempts, please contact administrator!")
 
-def add_user():
-    show_list()
-    print('')
-    username = input('Register your username and press "Enter": ')
-    while find_user(username) is not None:
-        print('The name with this name is already registered, please provide another name')
-        username = input('Register your username and press "Enter": ')
-    password = input('Register your password and press "Enter": ')
-    while not validate_password(password):
-        password = input('Please enter a valid password: ')
-    id_num = generate_id()
-    users.append({"username": username, "password": password, "ID": id_num})
 
-
-add_user()
-show_list()
-
-
-def sign_in():
-    print('')
-    username_input = input('Enter your username and press "Enter": ')
-    password_input = input('Enter your password and press "Enter": ')
+def change_password(input_username):
+    input_username = input("Enter your username: ")
     for user in users:
-        if username_input == user['username'] and password_input == user['password']:
-            return True
-    return False
-
-
-for _ in range(5):
-    if sign_in() is True:
-        print('Welcome to Tax Management System!')
-        break
-
+        if user['username'].lower() == input_username.lower():
+            input_old_password = input("Hello " + user['username'] + " enter your password: ")
+            if user['password'] == input_old_password:
+                input_new_password1 = input("Please enter your new password: ")
+                while not validate_password(input_new_password1):
+                    input_new_password1 = input('Please enter a valid password: ')
+                input_new_password2 = input("Please re-enter your new password: ")
+                if input_new_password1 == input_new_password2:
+                    user['password'] = input_new_password2
+                    print('Password updated successfully!')
+                    return True
+            else:
+                if user['password'] != input_old_password:
+                    print('Incorrect password entered, please check your credentials!')
+                    change_password(input_username)
     else:
-        print('Incorrect credentials, please check your input!')
-        attempts = attempts + 1
+        print('Incorrect username entered, please check your credentials!')
+        return False
 
-if attempts == attempts_limit:
-    print("Oops, too many wrong attempts, please contact administrator!")
+
+change_password('username')
