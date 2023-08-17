@@ -157,20 +157,19 @@ def change_password(input_username):
         return False
 
 
-def generate_pass():
-    pass_list = []
-    for number in range(8):
-        set_selector = random.randint(0, 2)
-        if set_selector == 0:
-            pass_list.append(str(random.randint(0, 9)))
-        elif set_selector == 1:
-            pass_list.append(chr(random.randint(65, 90)))
-        else:
-            pass_list.append(chr(random.randint(97, 122)))
-    password = ''
-    for symbol in pass_list:
-        password += symbol
-    while not validate_password(password):
-        generate_pass()
-    else:
-        return password
+def generate_password():
+    status = False
+
+    while status is False:
+        password = ""
+        for number in range(8):
+            selector = random.randint(0, 2)
+            if selector == 0:
+                password += str(random.randint(0, 9))
+            elif selector == 1:
+                password += chr(random.randint(65, 90))
+            else:
+                password += chr(random.randint(97, 122))
+        status = validate_password(password)
+        
+    return password
