@@ -1,5 +1,6 @@
 # Credentials check program
 # Variant 3: "Range function"
+import random
 attempts = 0
 attempts_limit = 5
 users = [
@@ -169,4 +170,24 @@ def change_password(input_username):
         print('User with this name is not registered. Process terminated.')
         return False
 
+
 change_password('Ben')
+
+
+def generate_pass():
+    pass_list = []
+    for n in range(8):
+        set_selector = random.randint(0, 2)
+        if set_selector == 0:
+            pass_list.append(str(random.randint(0, 9)))
+        elif set_selector == 1:
+            pass_list.append(chr(random.randint(65, 90)))
+        else:
+            pass_list.append(chr(random.randint(97, 122)))
+    password = ''
+    for c in list(pass_list):
+        password += '' + c
+    return password
+
+
+generate_pass()
