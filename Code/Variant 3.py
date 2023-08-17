@@ -13,74 +13,66 @@ users = [
 ]
 
 
-# def generate_id():
-#     id_list = []
-#     for user in users:
-#         id_list.append(user['user_id'])
-#     if not id_list:
-#         return 1
-#     elif id_list[0] != 1:
-#         return 1
-#     else:
-#         for i in range(len(id_list) - 1):
-#             if id_list[i] == (id_list[i + 1] - 1):
-#                 continue
-#             else:
-#                 return i + 2
-#         else:
-#             list_number = len(id_list)
-#             return list_number + 1
-#
-#
-# generate_id()
-#
-#
-# def delete_user(id_num):
-#     for user in users:
-#         if user['user_id'] == id_num:
-#             users.remove(user)
-#             print(f'User with ID {id_num} has been deleted')
-#             break
-#
+def generate_id():
+    id_list = []
+    for user in users:
+        id_list.append(user['user_id'])
+    if not id_list:
+        return 1
+    elif id_list[0] != 1:
+        return 1
+    else:
+        for i in range(len(id_list) - 1):
+            if id_list[i] == (id_list[i + 1] - 1):
+                continue
+            else:
+                return i + 2
+        else:
+            list_number = len(id_list)
+            return list_number + 1
 
-# delete_user(6)
-#
-#
-# def user_info_printout(users):
-#     while True:
-#         print('Please enter user ID for printout:')
-#         try:
-#             user_id_input = int(input())
-#         except ValueError:
-#             print('Invalid input. Please neter a valid user ID.')
-#             continue
-#         found = False
-#         for user in users:
-#             if user['user_id'] == user_id_input:
-#                 print(user)
-#                 found = True
-#                 break
-#         if not found:
-#             print(f'User with ID {user_id_input} not found')
-#
-#
-# user_info_printout(users)
 
-# def find_user(user_name):
-#     for user in users:
-#         if user['username'] == user_name:
-#             print(user_name)
-#             return user
-#     return None
-#
-#
-# result = find_user('Tom')
-#
-#
-# def show_list():
-#     print('The list of users is as follows:')
-#     for user in users:
-#         print(user['username'])
+def delete_user(id_num):
+    for user in users:
+        if user['user_id'] == id_num:
+            users.remove(user)
+            print(f'User with ID {id_num} has been deleted')
+            break
+
+
+def user_info_printout(users):
+    while True:
+        print('Please enter user ID for printout:')
+        try:
+            user_id_input = int(input())
+        except ValueError:
+            print('Invalid input. Please neter a valid user ID.')
+            continue
+        found = False
+        for user in users:
+            if user['user_id'] == user_id_input:
+                print(user)
+                found = True
+                break
+        if not found:
+            print(f'User with ID {user_id_input} not found')
+
+
+def find_user(user_name):
+    for user in users:
+        if user['username'] == user_name:
+            print(user_name)
+            return user
+    return None
+
+
+result = find_user('Tom')
+
+
+def show_list():
+    print('The list of users is as follows:')
+    for user in users:
+        print(user['username'])
 
 
 def validate_password(password):
@@ -105,46 +97,40 @@ def validate_password(password):
     else:
         return True
 
-#
-# def add_user():
-#     show_list()
-#     print('')
-#     username = input('Register your username and press "Enter": ')
-#     while find_user(username) is not None:
-#         print('The name with this name is already registered, please provide another name')
-#         username = input('Register your username and press "Enter": ')
-#     password = input('Register your password and press "Enter": ')
-#     while not validate_password(password):
-#         password = input('Please enter a valid password: ')
-#     id_num = generate_id()
-#     users.append({"username": username, "password": password, "ID": id_num})
-#
-#
-# add_user()
-# show_list()
-#
-#
-# def sign_in():
-#     print('')
-#     username_input = input('Enter your username and press "Enter": ')
-#     password_input = input('Enter your password and press "Enter": ')
-#     for user in users:
-#         if username_input == user['username'] and password_input == user['password']:
-#             return True
-#     return False
-#
-#
-# for _ in range(5):
-#     if sign_in() is True:
-#         print('Welcome to Tax Management System!')
-#         break
-#
-#     else:
-#         print('Incorrect credentials, please check your input!')
-#         attempts = attempts + 1
-#
-# if attempts == attempts_limit:
-#     print("Oops, too many wrong attempts, please contact administrator!")
+
+def add_user():
+    show_list()
+    print('')
+    username = input('Register your username and press "Enter": ')
+    while find_user(username) is not None:
+        print('The name with this name is already registered, please provide another name')
+        username = input('Register your username and press "Enter": ')
+    password = input('Register your password and press "Enter": ')
+    while not validate_password(password):
+        password = input('Please enter a valid password: ')
+    id_num = generate_id()
+    users.append({"username": username, "password": password, "ID": id_num})
+
+
+def sign_in():
+    print('')
+    username_input = input('Enter your username and press "Enter": ')
+    password_input = input('Enter your password and press "Enter": ')
+    for user in users:
+        if username_input == user['username'] and password_input == user['password']:
+            return True
+    return False
+
+
+for _ in range(5):
+    if sign_in() is True:
+        print('Welcome to Tax Management System!')
+        break
+    else:
+        print('Incorrect credentials, please check your input!')
+        attempts = attempts + 1
+if attempts == attempts_limit:
+    print("Oops, too many wrong attempts, please contact administrator!")
 
 
 def change_password(input_username):
@@ -171,12 +157,9 @@ def change_password(input_username):
         return False
 
 
-change_password('Ben')
-
-
 def generate_pass():
     pass_list = []
-    for n in range(8):
+    for number in range(8):
         set_selector = random.randint(0, 2)
         if set_selector == 0:
             pass_list.append(str(random.randint(0, 9)))
@@ -185,9 +168,9 @@ def generate_pass():
         else:
             pass_list.append(chr(random.randint(97, 122)))
     password = ''
-    for c in list(pass_list):
-        password += '' + c
-    return password
-
-
-generate_pass()
+    for symbol in pass_list:
+        password += symbol
+    while not validate_password(password):
+        generate_pass()
+    else:
+        return password
