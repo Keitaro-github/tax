@@ -163,8 +163,10 @@ def change_password(input_username):
                     print('Password updated successfully!')
                     return True
                 elif input_new_password1 != input_new_password2:
-                    print('Password is not the same. Procedure terminated.')
+                    print('Password is not the same. Process terminated.')
                     return False
+    else:
+        print('User with this name is not registered. Process terminated.')
+        return False
 
-
-change_password('ben')
+change_password('Ben')
