@@ -17,7 +17,7 @@ def create_history_file():
 
     # Get current module location.
     current_folder = os.getcwd()
-    #  Create "cache" folder pathname.
+    # Create "cache" folder pathname.
     cache_folder = os.path.join(current_folder, "cache")
     # Check whether cache folder has not been created yet.
     if not os.path.isdir(cache_folder):
