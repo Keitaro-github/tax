@@ -3,23 +3,40 @@ import getpass
 from database import users
 import datetime
 import os
+
+
 file_name = None
 
 
 def create_history_file():
     global file_name
+    
     timestamp = datetime.datetime.now()
-    file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
-    file_name = 'History_' + file_timestamp + '.txt'
     interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
+    file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
+
+    # Get current module location.
+    current_folder = os.getcwd()
+    #  Create "cache" folder pathname.
+    cache_folder = os.path.join(current_folder, "cache")
+    # Check whether cache folder has not been created yet.
+    if not os.path.isdir(cache_folder):
+        # Create cache folder on PC for storing all histories.
+        os.mkdir(cache_folder)
+    # Create absolute history filename based on full path to cache folder 
+    # and history filename.
+    file_name = os.path.join(cache_folder, 'History_' + file_timestamp + '.txt')
+    
     with open(file_name, 'w') as history_file:
         history_file.write(str(interaction_timestamp).strip() + ' The program initiated.\n')
 
 
 def write_history_file(message):
     global file_name
+    
     timestamp = datetime.datetime.now()
     interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
+    
     if file_name is None:
         print('Please create file first.')
         return False
