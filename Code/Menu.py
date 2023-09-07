@@ -12,6 +12,8 @@ print('Welcome to Tax Management System!'
       # '\n 7. Show list'
       # '\n 8. Generate ID'
       # '\n 9. user infor printout'
+      '\n 10. Read csv'
+      '\n 11. Write to csv'
       '\n 0. Exit operation')
 
 signin_services.write_history_file('Welcome to Tax Management System!'
@@ -25,6 +27,8 @@ signin_services.write_history_file('Welcome to Tax Management System!'
                                    # '\n 7. Show list'
                                    # '\n 8. Generate ID'
                                    # '\n 9. user infor printout'
+                                   '\n 10. Read csv'
+                                   '\n 11. Write to csv'
                                    '\n 0. Exit operation\n')
 
 operations = {
@@ -37,8 +41,11 @@ operations = {
       # 7: 'Show list',
       # 8: 'Generate ID',
       # 9: 'User info printout'
-      0: 'Exit operation'
-}
+      10: 'Read csv',
+      11: 'Write to csv',
+      0: 'Exit operation'}
+
+
 while True:
     operation = int(input('\nChoose operation: '))
     signin_services.write_history_file('Choose operation: \n')
@@ -73,6 +80,10 @@ while True:
         signin_services.write_history_file('Please input username: \n')
         signin_services.write_history_file(users +'\n')
         result = signin_services.user_info_printout(users)
+    elif operation == 10:
+        result = signin_services.read_csv()
+    elif operation == 11:
+        result = signin_services.write_csv()
     elif operation == 0:
         print('You have exited the application.')
         signin_services.write_history_file('You have exited the application.\n')
@@ -80,3 +91,7 @@ while True:
     else:
         print('Please choose correct operation number.')
         signin_services.write_history_file('Please choose correct operation number.\n')
+
+
+
+
