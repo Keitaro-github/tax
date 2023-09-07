@@ -1,9 +1,11 @@
 import random
 import getpass
-from database import users
+from database_services import users
 import datetime
 import os
+import csv
 file_name = None
+csv_file = None
 
 
 def create_history_file():
@@ -20,6 +22,10 @@ def write_history_file(message):
     global file_name
     timestamp = datetime.datetime.now()
     interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
+    folder_name = '__pycache__'
+    file_path = os.path.join(folder_name, file_name)
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
     if file_name is None:
         print('Please create file first.')
         return False
@@ -27,7 +33,7 @@ def write_history_file(message):
         print('The file does not exists.')
         return False
     try:
-        with open(file_name, 'a') as history_file:
+        with open(file_path, 'a') as history_file:
             history_file.write(str(interaction_timestamp).strip() + ' ' + message)
     except OSError:
         print('Error happened while accessing history file.')
@@ -254,3 +260,64 @@ def generate_password():
     print('Password generated successfully!')
     write_history_file('Password generated successfully!\n')
     return password
+
+
+def read_csv():
+    current_directory = os.getcwd()
+    file_name = 'users.csv'
+    csv_file = os.path.join(current_directory, file_name)
+    if csv_file is None:
+        print('Please create csv file first.')
+        return None
+    if os.path.isfile(csv_file) is False:
+        print('The csv file does not exist.')
+        return None
+    try:
+        with open(csv_file, 'r', encoding='utf-8-sig') as csv_file:
+            csv_reader = csv.reader(csv_file)
+            headers = next(csv_reader)
+            data = []
+            for row in csv_reader:
+                record = {}
+                for key, value in enumerate(row):
+                    record[headers[key]] = value
+                data.append(record)
+    except OSError:
+        print('Error happened while accessing csv file.')
+        return False
+    print(data)
+    return data
+
+
+def write_csv():
+    data = []
+    current_directory = os.getcwd()
+    file_name = 'users.csv'
+    csv_file = os.path.join(current_directory, file_name)
+    if csv_file is None:
+        print('Please create csv file first.')
+        return False
+    if os.path.isfile(csv_file) is False:
+        print('The csv file does not exist.')
+        return False
+    try:
+        while True:
+            username = input('Please enter username or press "Enter" to quit: ')
+            if not username:
+                print('Registration interrupted.')
+                break
+            password = input('Please enter password: ')
+            while not validate_password(password):
+                password = input('Please enter a valid password or press "Enter" to quit: ')
+                if not password:
+                    print('Registration interrupted.')
+                    break
+            user_ID = input('Please enter user ID: ')
+            data.append([username, password, user_ID])
+        with open(csv_file, 'a', newline='') as csv_file:
+            csv_writer = csv.writer(csv_file)
+            csv_writer.writerows(data)
+    except OSError:
+        print('Error happened while accessing csv file.')
+        return False
+    return True
