@@ -50,7 +50,7 @@ while True:
     elif operation == 3:
         input_username = input('Please input username: ')
         signin_services.write_history_file('Please input username: \n')
-        signin_services.write_history_file(input_username +'\n')
+        signin_services.write_history_file(input_username + '\n')
         result = signin_services.change_password(input_username)
     elif operation == 4:
         result = signin_services.generate_password()
@@ -62,7 +62,7 @@ while True:
     elif operation == 6:
         user_name = input('Please input username: ')
         signin_services.write_history_file('Please input username: \n')
-        signin_services.write_history_file(user_name +'\n')
+        signin_services.write_history_file(user_name + '\n')
         result = signin_services.find_user(user_name)
     elif operation == 7:
         result = signin_services.show_list()
@@ -71,7 +71,7 @@ while True:
     elif operation == 9:
         users = input('Please input username')
         signin_services.write_history_file('Please input username: \n')
-        signin_services.write_history_file(users +'\n')
+        signin_services.write_history_file(users + '\n')
         result = signin_services.user_info_printout(users)
     elif operation == 0:
         print('You have exited the application.')
