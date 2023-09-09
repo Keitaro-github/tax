@@ -13,8 +13,8 @@ print('Welcome to Tax Management System!'
       # '\n 7. Show list'
       # '\n 8. Generate ID'
       # '\n 9. user infor printout'
-      '\n 10. Read csv'
-      '\n 11. Write to csv'
+      # '\n 10. Read csv'
+      # '\n 11. Write to csv'
       '\n 0. Exit operation')
 
 signin_services.write_history_file('Welcome to Tax Management System!'
@@ -28,8 +28,8 @@ signin_services.write_history_file('Welcome to Tax Management System!'
                                    # '\n 7. Show list'
                                    # '\n 8. Generate ID'
                                    # '\n 9. user infor printout'
-                                   '\n 10. Read csv'
-                                   '\n 11. Write to csv'
+                                   # '\n 10. Read csv'
+                                   # '\n 11. Write to csv'
                                    '\n 0. Exit operation\n')
 
 operations = {
@@ -42,8 +42,8 @@ operations = {
       # 7: 'Show list',
       # 8: 'Generate ID',
       # 9: 'User info printout'
-      10: 'Read csv',
-      11: 'Write to csv',
+      # 10: 'Read csv',
+      # 11: 'Write to csv',
       0: 'Exit operation'}
 
 
