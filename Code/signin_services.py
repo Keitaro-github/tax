@@ -10,32 +10,43 @@ file_name = None
 
 def create_history_file():
     global file_name
+
     timestamp = datetime.datetime.now()
     file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
     file_name = 'History_' + file_timestamp + '.txt'
     interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
-    folder_name = '__pycache__'
-    file_path = os.path.join(folder_name, file_name)
-    with open(file_path, 'w') as history_file:
+    file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
+
+    # Get current module location.
+    current_folder = os.getcwd()
+    #  Create "cache" folder pathname.
+    cache_folder = os.path.join(current_folder, "cache")
+    # Check whether cache folder has not been created yet.
+    if not os.path.isdir(cache_folder):
+        # Create cache folder on PC for storing all histories.
+        os.mkdir(cache_folder)
+    # Create absolute history filename based on full path to cache folder
+    # and history filename.
+    file_name = os.path.join(cache_folder, 'History_' + file_timestamp + '.txt')
+
+    with open(file_name, 'w') as history_file:
         history_file.write(str(interaction_timestamp).strip() + ' The program initiated.\n')
 
 
 def write_history_file(message):
     global file_name
+
     timestamp = datetime.datetime.now()
     interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
-    folder_name = '__pycache__'
-    file_path = os.path.join(folder_name, file_name)
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
+
     if file_name is None:
         print('Please create file first.')
         return False
-    if not os.path.isfile(file_path):
+    if not os.path.isfile(file_name):
         print('The file does not exists.')
         return False
     try:
-        with open(file_path, 'a') as history_file:
+        with open(file_name, 'a') as history_file:
             history_file.write(str(interaction_timestamp).strip() + ' ' + message)
     except OSError:
         print('Error happened while accessing history file.')
