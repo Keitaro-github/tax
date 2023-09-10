@@ -3,7 +3,55 @@
 import random
 import getpass
 from database import users
+import datetime
+import os
+file_name = None
 
+
+def create_history_file():
+    global file_name
+
+    timestamp = datetime.datetime.now()
+    file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
+    file_name = 'History_' + file_timestamp + '.txt'
+    interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
+    file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
+
+    # Get current module location.
+    current_folder = os.getcwd()
+    #  Create "cache" folder pathname.
+    cache_folder = os.path.join(current_folder, "cache")
+    # Check whether cache folder has not been created yet.
+    if not os.path.isdir(cache_folder):
+        # Create cache folder on PC for storing all histories.
+        os.mkdir(cache_folder)
+    # Create absolute history filename based on full path to cache folder
+    # and history filename.
+    file_name = os.path.join(cache_folder, 'History_' + file_timestamp + '.txt')
+
+    with open(file_name, 'w') as history_file:
+        history_file.write(str(interaction_timestamp).strip() + ' The program initiated.\n')
+
+
+def write_history_file(message):
+    global file_name
+
+    timestamp = datetime.datetime.now()
+    interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
+
+    if file_name is None:
+        print('Please create file first.')
+        return False
+    if not os.path.isfile(file_name):
+        print('The file does not exists.')
+        return False
+    try:
+        with open(file_name, 'a') as history_file:
+            history_file.write(str(interaction_timestamp).strip() + ' ' + message)
+    except OSError:
+        print('Error happened while accessing history file.')
+        return False
+    return True
 
 
 def generate_id():
@@ -30,35 +78,42 @@ def delete_user(id_num):
         if user['user_id'] == id_num:
             users.remove(user)
             print(f'User with ID {id_num} has been deleted')
+            write_history_file(f'User with ID {id_num} has been deleted\n')
             break
         else:
             continue
     else:
         print('The user with such ID was not found.')
+        write_history_file('The user with such ID was not found.\n')
 
 
 def user_info_printout(users):
     while True:
-        print('Please enter user ID for printout:')
+        print('Please enter user ID for printout: ')
+        write_history_file('Please enter user ID for printout: \n')
         try:
             user_id_input = int(input())
         except ValueError:
             print('Invalid input. Please enter a valid user ID.')
+            write_history_file('Invalid input. Please enter a valid user ID.\n')
             continue
         found = False
         for user in users:
             if user['user_id'] == user_id_input:
                 print(user)
+                write_history_file(user)
                 found = True
                 break
         if not found:
             print(f'User with ID {user_id_input} not found')
+            write_history_file(f'User with ID {user_id_input} not found\n')
 
 
 def find_user(user_name):
     for user in users:
         if user['username'] == user_name:
             print(user_name)
+            write_history_file(user_name)
             return user
     return None
 
@@ -68,8 +123,10 @@ result = find_user('Tom')
 
 def show_list():
     print('The list of users is as follows:')
+    write_history_file('The list of users is as follows:\n')
     for user in users:
         print(user['username'])
+        write_history_file(user['username\n'])
 
 
 def validate_password(password):
@@ -78,51 +135,66 @@ def validate_password(password):
     password_alphabets_only = str.isalpha(password)
     if password_length <= 7:
         print('Too short password!')
+        write_history_file('Too short password!\n')
         return False
     elif password_digits_only is True:
         print('Password must contain letters!')
+        write_history_file('Password must contain letters!\n')
         return False
     elif password_alphabets_only is True:
         print('Password must contain digits!')
+        write_history_file('Password must contain digits!\n')
         return False
     elif password.islower() is True:
         print('Password must contain uppercase letters!')
+        write_history_file('Password must contain uppercase letters!\n')
         return False
     elif password.isupper() is True:
         print('Password must contain lowercase letters!')
+        write_history_file('Password must contain lowercase letters!\n')
         return False
     else:
         return True
 
 
 def add_user():
-    # show_list()
-    # print('')
     username = input('Register your username and press "Enter": ')
+    write_history_file('Register your username and press "Enter": \n')
+    write_history_file(username + '\n')
     while find_user(username) is not None:
         print('The username is occupied already, please register unique name')
+        write_history_file('The username is occupied already, please register unique name\n')
         username = input('Register your username and press "Enter": ')
+        write_history_file('Register your username and press "Enter": \n')
+        write_history_file(username + '\n')
     password = input('Register your password and press "Enter": ')
+    write_history_file('Register your password and press "Enter": \n')
+    write_history_file('\n')
     while not validate_password(password):
         password = input('Please enter a valid password or enter 0 to exit: ')
+        write_history_file('Please enter a valid password or enter 0 to exit: \n')
+        write_history_file('\n')
         if password == '0':
+            write_history_file('0' + '.\n')
             print('Operation aborted.')
+            write_history_file('Operation aborted.\n')
             return
     id_num = generate_id()
-    users.append({"username": username, "password": password, "ID": id_num})
+    users.append({'username': username, 'password': password, 'ID': id_num})
     print('User added successfully!')
+    write_history_file('User added successfully!\n')
 
 
 def credential_check():
-    print('')
-    username_input = input('Enter your username and press "Enter": ')
+    username_input = input('\n' + 'Enter your username and press "Enter": ')
+    write_history_file('Enter your username and press "Enter": \n')
+    write_history_file(username_input + '\n')
     password_input = getpass.getpass('Enter your password and press "Enter": ')
-    # password_input = getpass.getpass(prompt='Input your password: ')
+    write_history_file('Enter your password and press "Enter": \n')
+    write_history_file('\n')
     for user in users:
         if username_input == user['username'] and password_input == user['password']:
             return True
-        elif input == "0":
-            return
     return False
 
 
@@ -131,48 +203,64 @@ def sign_in():
     attempts_limit = 5
     for _ in range(5):
         if credential_check() is True:
-            print('Welcome to Tax Management System!')
+            print('Login successful!')
+            write_history_file('Login successful!\n')
             break
         else:
             user_input = input('Incorrect credentials, please check your input or enter 0 to exit! ')
+            write_history_file(user_input + '\n')
             if user_input == '0':
+                write_history_file('0' + '\n')
                 print('Operation aborted.')
+                write_history_file('Operation aborted.\n')
                 return
             else:
                 attempts = attempts + 1
     if attempts == attempts_limit:
-        print("Oops, too many wrong attempts, please contact administrator!")
+        print('Oops, too many wrong attempts, please contact administrator!')
+        write_history_file('Oops, too many wrong attempts, please contact administrator!\n')
 
 
 def change_password(input_username):
     for user in users:
         if user['username'].lower() == input_username.lower():
-            input_old_password = input("Hello " + user['username'] + ", please enter your password: ")
+            input_old_password = input('Hello ''' + user['username'] + ', please enter your password: ')
+            write_history_file('\n')
             if user['password'] != input_old_password:
                 print('Incorrect password entered. Process terminated.')
+                write_history_file('Incorrect password entered. Process terminated.\n')
                 return False
             elif user['password'] == input_old_password:
-                input_new_password1 = input("Please enter your new password: ")
+                input_new_password1 = input('Please enter your new password: ')
+                write_history_file('Please enter your new password: \n')
+                write_history_file('\n')
                 while not validate_password(input_new_password1):
                     input_new_password1 = input('Please enter a valid password: ')
-                input_new_password2 = input("Please re-enter your new password: ")
+                    write_history_file('Please enter a valid password: \n')
+                    write_history_file('\n')
+                input_new_password2 = input('Please re-enter your new password: ')
+                write_history_file('Please re-enter your new password: \n')
+                write_history_file('\n')
                 if input_new_password1 == input_new_password2:
                     user['password'] = input_new_password2
                     print('Password updated successfully!')
+                    write_history_file('Password updated successfully!\n')
                     return True
                 elif input_new_password1 != input_new_password2:
                     print('Password is not the same. Process terminated.')
+                    write_history_file('Password is not the same. Process terminated.\n')
                     return False
     else:
         print('User with this name is not registered. Process terminated.')
+        write_history_file('User with this name is not registered. Process terminated.\n')
         return False
 
 
 def generate_password():
     status = False
-
+    password = ''
     while status is False:
-        password = ""
+        # password = ""
         for number in range(8):
             selector = random.randint(0, 2)
             if selector == 0:
@@ -183,4 +271,5 @@ def generate_password():
                 password += chr(random.randint(97, 122))
         status = validate_password(password)
     print('Password generated successfully!')
+    write_history_file('Password generated successfully!\n')
     return password
