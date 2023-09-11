@@ -9,7 +9,7 @@ print('Welcome to Tax Management System!'
       '\n 3. Change password'
       '\n 4. Generate password'
       '\n 5. Delete user'
-      # '\n 6. Find user'
+      '\n 6. Find user'
       # '\n 7. Show list'
       # '\n 8. Generate ID'
       # '\n 9. user infor printout'
@@ -24,7 +24,7 @@ signin_services.write_history_file('Welcome to Tax Management System!'
                                    '\n 3. Change password'
                                    '\n 4. Generate password'
                                    '\n 5. Delete user'
-                                   # '\n 6. Find user'
+                                   '\n 6. Find user'
                                    # '\n 7. Show list'
                                    # '\n 8. Generate ID'
                                    # '\n 9. user infor printout'
@@ -38,7 +38,7 @@ operations = {
       3: 'Change password',
       4: 'Generate password',
       5: 'Delete user',
-      # 6: 'Find user',
+      6: 'Find user',
       # 7: 'Show list',
       # 8: 'Generate ID',
       # 9: 'User info printout'
