@@ -12,7 +12,7 @@ print('Welcome to Tax Management System!'
       '\n 6. Find user'
       # '\n 7. Show list'
       # '\n 8. Generate ID'
-      # '\n 9. user infor printout'
+      # '\n 9. User info printout'
       # '\n 10. Read csv'
       # '\n 11. Write to csv'
       '\n 0. Exit operation')
@@ -27,7 +27,7 @@ signin_services.write_history_file('Welcome to Tax Management System!'
                                    '\n 6. Find user'
                                    # '\n 7. Show list'
                                    # '\n 8. Generate ID'
-                                   # '\n 9. user infor printout'
+                                   # '\n 9. User info printout'
                                    # '\n 10. Read csv'
                                    # '\n 11. Write to csv'
                                    '\n 0. Exit operation\n')
@@ -41,7 +41,7 @@ operations = {
       6: 'Find user',
       # 7: 'Show list',
       # 8: 'Generate ID',
-      # 9: 'User info printout'
+      # 9: 'User info printout',
       # 10: 'Read csv',
       # 11: 'Write to csv',
       0: 'Exit operation'}
@@ -77,10 +77,7 @@ while True:
     elif operation == 8:
         result = signin_services.generate_id()
     elif operation == 9:
-        users = input('Please input username')
-        signin_services.write_history_file('Please input username: \n')
-        signin_services.write_history_file(users + '\n')
-        result = signin_services.user_info_printout(users)
+        result = signin_services.user_info_printout(username=None)
     elif operation == 10:
         result = database_services.read_csv()
     elif operation == 11:

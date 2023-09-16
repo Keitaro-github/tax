@@ -1,7 +1,6 @@
 import random
 import getpass
 import database_services
-from database_services import users
 import datetime
 import os
 file_name = None
@@ -55,8 +54,9 @@ def write_history_file(message):
 
 def generate_id():
     id_list = []
-    for user in users:
-        id_list.append(user['user_id'])
+    user_list = database_services.read_csv()
+    for user in user_list:
+        id_list.append(int(user['user_id']))
     if not id_list:
         return 1
     elif id_list[0] != 1:
@@ -73,39 +73,38 @@ def generate_id():
 
 
 def delete_user(id_num):
-    for user in users:
-        if user['user_id'] == id_num:
-            users.remove(user)
-            print(f'User with ID {id_num} has been deleted')
-            write_history_file(f'User with ID {id_num} has been deleted\n')
+    user_list = database_services.read_csv()
+    index = None
+    for i, user in enumerate(user_list):
+        if int(user['user_id']) == id_num:
+            index = i
             break
         else:
             continue
+    if index is not None:
+        user_list.pop(index)
+        print(f'User with ID {id_num} has been deleted')
+        write_history_file(f'User with ID {id_num} has been deleted\n')
+        database_services.rewrite_csv(user_list)
+        return user_list
+        # How to write an updated list back to csv.file?
     else:
         print('The user with such ID was not found.')
         write_history_file('The user with such ID was not found.\n')
 
 
-def user_info_printout(users):
-    while True:
-        print('Please enter user ID for printout: ')
-        write_history_file('Please enter user ID for printout: \n')
-        try:
-            user_id_input = int(input())
-        except ValueError:
-            print('Invalid input. Please enter a valid user ID.')
-            write_history_file('Invalid input. Please enter a valid user ID.\n')
-            continue
-        found = False
-        for user in users:
-            if user['user_id'] == user_id_input:
-                print(user)
-                write_history_file(user)
-                found = True
-                break
-        if not found:
-            print(f'User with ID {user_id_input} not found')
-            write_history_file(f'User with ID {user_id_input} not found\n')
+def user_info_printout(username=None):
+    found = False
+    # username = 'Ben' #Line for manual test
+    user_list = database_services.read_csv()
+    for user in user_list:
+        if user['username'] == username:
+            write_history_file(str(user) + '\n')
+            found = True
+            break
+    if not found:
+        print(f'Username {username} not found')
+        write_history_file(f'Username {username} not found\n')
 
 
 def find_user(user_name):
@@ -123,9 +122,10 @@ result = find_user('Nikolai')
 def show_list():
     print('The list of users is as follows:')
     write_history_file('The list of users is as follows:\n')
-    for user in users:
-        print(user['username'])
-        write_history_file(user['username\n'])
+    output = database_services.read_csv()
+    for user in output:
+        print(user)
+        write_history_file(str(user) + '\n')
 
 
 def validate_password(password):
@@ -179,9 +179,11 @@ def add_user():
             write_history_file('Operation aborted.\n')
             return
     id_num = generate_id()
-    users.append({'username': username, 'password': password, 'ID': id_num})
+    database_services.write_csv(username, password, id_num)
     print('User added successfully!')
     write_history_file('User added successfully!\n')
+    user_list = database_services.read_csv()
+    database_services.rewrite_csv(user_list)
 
 
 def credential_check():
@@ -191,13 +193,14 @@ def credential_check():
     password_input = getpass.getpass('Enter your password and press "Enter": ')
     write_history_file('Enter your password and press "Enter": \n')
     write_history_file('\n')
-    for user in users:
+    user_list = database_services.read_csv()
+    for user in user_list:
         if username_input == user['username'] and password_input == user['password']:
             return True
     return False
 
 
-def sign_in():
+def sign_in():  # Works only under debug mode due to implemented feature of hidden password.
     attempts = 0
     attempts_limit = 5
     for _ in range(5):
@@ -221,7 +224,8 @@ def sign_in():
 
 
 def change_password(input_username):
-    for user in users:
+    user_list = database_services.read_csv()
+    for user in user_list:
         if user['username'].lower() == input_username.lower():
             input_old_password = input('Hello ''' + user['username'] + ', please enter your password: ')
             write_history_file('\n')
@@ -244,6 +248,13 @@ def change_password(input_username):
                     user['password'] = input_new_password2
                     print('Password updated successfully!')
                     write_history_file('Password updated successfully!\n')
+                    user_list = database_services.read_csv()
+                    updated_users = []
+                    for user in user_list:
+                        if user['username'].lower() == input_username.lower():
+                            user['password'] = input_new_password2
+                        updated_users.append(user)
+                    database_services.rewrite_csv(updated_users)
                     return True
                 elif input_new_password1 != input_new_password2:
                     print('Password is not the same. Process terminated.')
