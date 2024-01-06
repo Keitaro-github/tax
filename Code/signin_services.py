@@ -1,12 +1,13 @@
 import random
 import getpass
-import database_services
+import Code.database_services as database_services
 import datetime
 import os
 
 
 file_name = None    
-
+terminal = False
+history = False
 
 def create_history_file():
     global file_name
@@ -54,7 +55,8 @@ def write_history_file(message):
     return True
 
 
-def output(message, terminal=True, history=True):
+# def output(message, terminal=True, history=True):
+def output(message):
     if terminal is True:
         print(message)
     if history is True:
@@ -66,6 +68,7 @@ def generate_id():
     user_list = database_services.read_csv()
     for user in user_list:
         id_list.append(int(user['user_id']))
+    id_list.sort()
     if not id_list:
         return 1
     elif id_list[0] != 1:
@@ -121,7 +124,8 @@ def find_user(user_name):
     for user in content:
         if user['username'] == user_name:
             write_history_file(user_name)
-            output(user_name, terminal=False)
+            # output(user_name, terminal=False)
+            output(user_name)
             return user_name
     return None
 
@@ -160,18 +164,23 @@ def validate_password(password):
 
 def add_user():
     username = input('Register your username and press <Enter>: ')
-    output(f"Register your username and press <Enter> \n {username}", terminal=False)
+    # output(f"Register your username and press <Enter> \n {username}", terminal=False)
+    output(f"Register your username and press <Enter> \n {username}")
     while find_user(username) is not None:
         output(f"The username is occupied already, please register unique name")
         username = input('Register your username and press <Enter>: ')
-        output(f"Register your username and press <Enter> \n {username}", terminal=False)
+        # output(f"Register your username and press <Enter> \n {username}", terminal=False)
+        output(f"Register your username and press <Enter> \n {username}")
     password = input('Register your password and press <Enter>: ')
-    output(f"Register your password and press <Enter> \n", terminal=False)
+    # output(f"Register your password and press <Enter> \n", terminal=False)
+    output(f"Register your password and press <Enter> \n")
     while not validate_password(password):
         password = input('Please enter a valid password or enter 0 to exit: ')
-        output(f"Please enter a valid password or enter 0 to exit: \n", terminal=False)
+        # output(f"Please enter a valid password or enter 0 to exit: \n", terminal=False)
+        output(f"Please enter a valid password or enter 0 to exit: \n")
         if password == '0':
-            output('0', terminal=False)
+            # output('0', terminal=False)
+            output('0')
             output('Operation aborted.')
             return
     id_num = generate_id()
@@ -181,14 +190,18 @@ def add_user():
     database_services.rewrite_csv(user_list)
 
 
-def credential_check():
-    username = input('\n' + 'Enter your username and press "Enter": ')
-    output(f"Register your username and press <Enter> \n {username}", terminal=False)
-    password_input = getpass.getpass('Enter your password and press <Enter>: ')
-    output(f"Enter your password and press <Enter>: \n", terminal=False)
+def credential_check(username, password):
+    # username = input('\n' + 'Enter your username and press "Enter": ')
+    # # output(f"Register your username and press <Enter> \n {username}", terminal=False)
+    # output(f"Register your username and press <Enter> \n {username}")
+    # password_input = getpass.getpass('Enter your password and press <Enter>: ')
+    # # output(f"Enter your password and press <Enter>: \n", terminal=False)
+    # output(f"Enter your password and press <Enter>: \n")
+
+
     user_list = database_services.read_csv()
     for user in user_list:
-        if username == user['username'] and password_input == user['password']:
+        if username == user['username'] and password == user['password']:
             return True
     return False
 
@@ -205,7 +218,8 @@ def sign_in():  # Works only under debug mode due to implemented feature of hidd
             write_history_file(user_input + '\n')
             output(user_input)
             if user_input == '0':
-                output('0', terminal=False)
+                # output('0', terminal=False)
+                output('0')
                 output('Operation aborted.')
                 return
             else:
@@ -219,18 +233,23 @@ def change_password(input_username):
     for user in user_list:
         if user['username'].lower() == input_username.lower():
             input_old_password = input('Hello ''' + user['username'] + ', please enter your password: ')
-            output('\n', terminal=False)
+            # output('\n', terminal=False)
+            output('\n')
             if user['password'] != input_old_password:
-                output('Incorrect password entered. Process terminated.', terminal=False)
+                # output('Incorrect password entered. Process terminated.', terminal=False)
+                output('Incorrect password entered. Process terminated.')
                 return False
             elif user['password'] == input_old_password:
                 input_new_password1 = input('Please enter your new password: ')
-                output('Please enter your new password: \n', terminal=False)
+                # output('Please enter your new password: \n', terminal=False)
+                output('Please enter your new password: \n')
                 while not validate_password(input_new_password1):
                     input_new_password1 = input('Please enter a valid password: ')
-                    output('Please enter a valid password: \n', terminal=False)
-                input_new_password2 = input('Please re-enter your new password: ')
-                output('Please re-enter your new password: \n', terminal=False)
+                    # output('Please enter a valid password: \n', terminal=False)
+                    output('Please enter a valid password: \n')
+                    input_new_password2 = input('Please re-enter your new password: ')
+                # output('Please re-enter your new password: \n', terminal=False)
+                output('Please re-enter your new password: \n')
                 if input_new_password1 == input_new_password2:
                     user['password'] = input_new_password2
                     output('Password updated successfully!')
@@ -262,6 +281,11 @@ def generate_password():
                 password += chr(random.randint(65, 90))
             else:
                 password += chr(random.randint(97, 122))
-        status = validate_password(password)
-        output('Password generated successfully!')
+        # status = validate_password(password)
+        # Code amended in order to prevent loop of password validation:
+        if validate_password(password):
+            status = True
+            output('Password generated successfully!')
+        else:
+            continue
     return password

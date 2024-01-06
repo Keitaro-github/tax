@@ -3,7 +3,7 @@ import csv
 
 
 def read_csv():
-    current_directory = os.getcwd()
+    current_directory = os.path.dirname(os.path.realpath(__file__))
     file_name = 'users.csv'
     csv_file = os.path.join(current_directory, file_name)
     if os.path.isfile(csv_file) is False:
