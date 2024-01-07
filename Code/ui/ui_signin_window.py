@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QCheckBox, QVBoxLayout, QHBoxLayout,
                              QMessageBox)
 import Code.signin_services as signin_services
@@ -97,7 +98,7 @@ class SignInWindow(QWidget):
     def __session_timeout(self):
         self.__sign_in_time_out_message()
         self.__timer.stop()
-        print("Time out!")
+        self.close()
 
     def __click_hide_checkbox(self):
         """
@@ -117,6 +118,7 @@ class SignInWindow(QWidget):
         :return: None
         :rtype:
         """
+
         self.__timer.start(180000)
 
         # Attempts limit check
@@ -127,13 +129,17 @@ class SignInWindow(QWidget):
         username = self.__username_edit.text()
         password = self.__password_edit.text()
 
-        print(f"Entered username: {username}")
-        print(f"Entered password: {password}")
-
         self.__button_clicked = True
 
-        if signin_services.credential_check(username, password):
+        sign_in_services = signin_services.SignInServices("127.0.0.1", 65432)
+        result = sign_in_services.check_credentials(username, password)
+
+        if result is True:
             self.__sign_in_success_message()
+            self.close()
+
+            command = f"python ui_tms_main_window.py {username} {password}"
+            os.system(command)
 
         elif not username and not password:
             if self.__button_clicked:
@@ -158,9 +164,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_success_message(self):
         """
-              This message is intended to be called automatically when the user successfully signs in.
-              :return: None
-              """
+        This message is intended to be called automatically when the user successfully signs in.
+        :return: None
+        """
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Sign in successful")
         confirmation_dialog.setText("You have successfully signed in!")
@@ -168,9 +174,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_failure_message(self):
         """
-              This message is intended to be called automatically when the user unsuccessfully tries to sign in.
-              :return: None
-              """
+        This message is intended to be called automatically when the user unsuccessfully tries to sign in.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -180,10 +186,10 @@ class SignInWindow(QWidget):
 
     def __sign_in_credentials_missing_message(self):
         """
-              This message is intended to be called automatically when the user tries to sign in without entering
-              credentials.
-              :return: None
-              """
+        This message is intended to be called automatically when the user tries to sign in without entering
+        credentials.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -193,9 +199,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_attempts_limit_message(self):
         """
-              This message is intended to be called automatically when the user reaches sign in attempts limit.
-              :return: None
-              """
+        This message is intended to be called automatically when the user reaches sign in attempts limit.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)
@@ -210,9 +216,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_time_out_message(self):
         """
-              This message is intended to be called automatically when the time for sing in runs out.
-              :return: None
-              """
+        This message is intended to be called automatically when the time for sing in runs out.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)

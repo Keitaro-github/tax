@@ -3,11 +3,15 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QLabel, QHBoxLayout,
                              QTabWidget, QSplitter, QFormLayout, QMenuBar)
 from PyQt6.QtGui import (QAction)
 from Code.ui.ui_new_user import NewUserWindow
+from Code.ui.ui_find_user import FindUserWindow
 
 
 class TMSMainWindow(QWidget):
-    def __init__(self):
+    def __init__(self, username, password):
         super().__init__()
+
+        self.__username = username
+        self.__password = password
 
         # Create the main layout
         main_layout = QHBoxLayout()
@@ -77,8 +81,6 @@ class TMSMainWindow(QWidget):
         right_widget.addTab(tab1, "General info")
         right_widget.addTab(tab2, "Tax card")
         right_widget.addTab(tab3, "Assets and liabilities")
-
-
         # Set font size for tab names
         tab_font = right_widget.font()
         tab_font.setPointSize(12)  # Set the desired font size for tab names
@@ -118,8 +120,8 @@ class TMSMainWindow(QWidget):
         action_exit = QAction("Exit", self)
 
         # Connect the options to the functions
-        action_create_new_user.triggered.connect(self.create_new_user_window)
-        action_find_user.triggered.connect(self.find_user_window)
+        action_create_new_user.triggered.connect(self.__show_new_user_window)
+        action_find_user.triggered.connect(self.__show_find_user_window)
 
         # Add actions to the menu and submenu
         user_menu.addAction(action_exit)
@@ -133,23 +135,32 @@ class TMSMainWindow(QWidget):
 
         main_layout.setMenuBar(menubar)
 
-        self.new_user_window = None
-        self.find_user_window = None
+        self.__new_user_window = None
+        self.__find_user_window = None
 
-    def create_new_user_window(self):
-        self.new_user_window = NewUserWindow()
-        self.new_user_window.show()
+    def __show_new_user_window(self):
+        """
+        Show NewUserWindow UI to create new user.
+        :return: None
+        """
 
-    def find_user_window(self):
-        from ui_find_user import FindUserWindow
-        self.find_user_window_instance = FindUserWindow(self)
-        self.find_user_window_instance.show()
+        self.__new_user_window = NewUserWindow()
+        self.__new_user_window.show()
 
-    def populate_user_information(self, user_info):
+    def __show_find_user_window(self):
+        """
+        Show FindUserWindow UI to find user.
+        :return: None
+        """
+
+        self.__find_user_window = FindUserWindow(self)
+        self.__find_user_window.show()
+
+    def __populate_user_information(self, user_info):
         """
         Populate the main window with the retrieved user information.
         """
-        if user_info:
+        if user_info is not None:
             # Update labels with user information
             self.label_national_id.setText(f"National ID: {user_info['national_id']}")
             self.label_name.setText(f"User name: {user_info['first_name']} {user_info['last_name']}")
@@ -186,6 +197,11 @@ class TMSMainWindow(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    main_window = TMSMainWindow()
+    try:
+        username = sys.argv[1]
+        password = sys.argv[2]
+        main_window = TMSMainWindow(username, password)
+    except IndexError:
+        main_window = TMSMainWindow(None, None)
     main_window.show()
     sys.exit(app.exec())

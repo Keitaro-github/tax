@@ -1,5 +1,5 @@
 import sys, csv
-from ui_tms_main_window import TMSMainWindow
+# from ui_tms_main_window import TMSMainWindow
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QVBoxLayout, QHBoxLayout,
                              QDateEdit, QMessageBox, QComboBox, QSpinBox)
 from PyQt6.QtCore import QDate
@@ -113,7 +113,6 @@ class FindUserWindow(QWidget):
         self.__main_layout.addLayout(layout_search_results)
         self.__main_layout.addLayout(button_layout)
 
-
     def __handle_widget_edit(self):
         # Slot method to handle the editingFinished signal for various widgets
         sender = self.sender()
@@ -163,7 +162,7 @@ class FindUserWindow(QWidget):
             self.__populate_search_results(search_results)
 
     def __search_csv(self, national_id, first_name, last_name, date_of_birth):
-        csv_file_path = r'C:\Users\serge\PycharmProjects\pythonProject\pet_projects\tax\Code\users.csv'
+        csv_file_path = r'C:/Projects/programing/keitaro/tax/Code/users.csv'
         search_results = []
 
         with open(csv_file_path, newline="", encoding="utf-8") as file:
@@ -216,7 +215,7 @@ class FindUserWindow(QWidget):
         Implement the logic to read the CSV file and extract user information.
         """
         # Add your logic to read the CSV file and retrieve user information based on national_id
-        csv_file_path = r'C:\Users\serge\PycharmProjects\pythonProject\pet_projects\tax\Code\users.csv'
+        csv_file_path = r'C:/Projects/programing/keitaro/tax/Code/users.csv'
 
         with open(csv_file_path, newline="", encoding="utf-8") as file:
             reader = csv.DictReader(file)
@@ -263,7 +262,6 @@ class FindUserWindow(QWidget):
 
 if __name__ == "__main__":
     application = QApplication(sys.argv)
-    main_window = TMSMainWindow()
-    user = FindUserWindow(main_window)
-    user.show()
+    find_user_window = FindUserWindow(None)
+    find_user_window.show()
     application.exec()
