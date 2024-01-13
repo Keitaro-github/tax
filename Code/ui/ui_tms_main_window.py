@@ -149,7 +149,7 @@ class TMSMainWindow(QWidget):
         """
         Populate the main window with the retrieved user information.
         """
-        if user_info:
+        if user_info is not None:
             # Update labels with user information
             self.label_national_id.setText(f"National ID: {user_info['national_id']}")
             self.label_name.setText(f"User name: {user_info['first_name']} {user_info['last_name']}")
