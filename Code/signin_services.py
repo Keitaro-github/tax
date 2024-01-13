@@ -3,6 +3,7 @@ import getpass
 import Code.database_services as database_services
 import datetime
 import os
+import socket
 
 
 file_name = None    
@@ -289,3 +290,72 @@ def generate_password():
         else:
             continue
     return password
+
+
+class SignInServices:
+    def __init__(self, host, port):
+        self.host = host  # The server's hostname or IP address
+        self.port = port  # The port used by the server
+        self.__username = None
+        self.__password = None
+
+    def __create_socket(self):
+        """
+        Create socket for communicating with TMS server.
+        :return: response if success, None otherwise
+        """
+
+        if self.__username is None or self.__password is None:
+            return None
+
+        credentials = f"{self.__username}|{self.__password}".encode()
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.connect((self.host, self.port))
+            client_socket.sendall(credentials)
+            response = client_socket.recv(1024)
+
+        if response != credentials:
+            response = None
+        return response
+
+    def set_port(self, number):
+        """
+        Assign port number to port attribute
+        :param number: port number
+        :return: True if port is set successfully, False otherwise
+        """
+
+        if type(number) is not int:
+            return False
+        self.port = number
+        return True
+
+    def set_host(self, address):
+        """
+        Assign IP address to host attribute
+        :param address: address number
+        :return: True if host is set successfully, False otherwise
+        """
+
+        if type(address) is not str:
+            return False
+        self.host = address
+        return True
+
+    def check_credentials(self, username, password):
+        """
+        Check whether provided credentials are valid
+        :param username: username
+        :param password: password
+        :return: True if credentials are valid, False otherwise
+        """
+
+        self.__username = username
+        self.__password = password
+
+        data = self.__create_socket()
+        if data is None:
+            return False
+        return True
+

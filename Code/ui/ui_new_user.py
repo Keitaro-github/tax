@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLab
 from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtCore import QRegularExpression
 
+
 class NewUserWindow(QWidget):
     def __init__(self):
         super().__init__()  # Initialize default constructor of parent class
