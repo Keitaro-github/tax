@@ -1,6 +1,5 @@
 import sys
-
-import tax.Code.database_services as database_services
+import database_services
 import socket
 
 
@@ -27,15 +26,16 @@ class SignInServices:
                         data = conn.recv(1024)
                         if not data:
                             break
-                        data = data.decode()
+                        data = data.decode()  # convert bytes to string
                         username, password = data.split('|')
                         result = self.__check_credentials(username, password)
                         if result is True:
                             # Create response using the same username and password divided by | symbol
-                            response = data.encode()
+                            response = data.encode()  # convert string to bytes
                             conn.sendall(response)
                         else:
-                            response = data.encode()[::-1]  # reverse data to indicate negative response
+                            response = data.encode()[::-1]  # convert string to bytes and reverse bytes in opposite
+                            # order to indicate negative response
                             conn.sendall(response)
 
     def __check_credentials(self, username, password):
@@ -57,6 +57,6 @@ class SignInServices:
 
 
 if __name__ == '__main__':
-    sign_in_servies = SignInServices("127.0.0.1", 65432)
-    sign_in_servies.create_socket()
+    sign_in_services = SignInServices("127.0.0.1", 65432)
+    sign_in_services.create_socket()
     sys.exit(0)

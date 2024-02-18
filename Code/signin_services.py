@@ -1,6 +1,5 @@
 import random
-import getpass
-import Code.database_services as database_services
+import database_services
 import datetime
 import os
 import socket
@@ -9,6 +8,7 @@ import socket
 file_name = None    
 terminal = False
 history = False
+
 
 def create_history_file():
     global file_name
@@ -99,7 +99,6 @@ def delete_user(id_num):
         output(f"User with ID {id_num} has been deleted")
         database_services.rewrite_csv(user_list)
         return user_list
-        # How to write an updated list back to csv.file?
     else:
         print('The user with such ID was not found.')
         write_history_file('The user with such ID was not found.\n')
@@ -198,7 +197,6 @@ def credential_check(username, password):
     # password_input = getpass.getpass('Enter your password and press <Enter>: ')
     # # output(f"Enter your password and press <Enter>: \n", terminal=False)
     # output(f"Enter your password and press <Enter>: \n")
-
 
     user_list = database_services.read_csv()
     for user in user_list:
@@ -358,4 +356,3 @@ class SignInServices:
         if data is None:
             return False
         return True
-

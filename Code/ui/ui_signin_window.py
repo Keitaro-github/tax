@@ -138,7 +138,8 @@ class SignInWindow(QWidget):
             self.__sign_in_success_message()
             self.close()
 
-            command = f"python ui_tms_main_window.py {username} {password}"
+            filename = os.getcwd() + '/' + "ui/ui_tms_main_window.py"
+            command = f"python {filename} {username} {password}"
             os.system(command)
 
         elif not username and not password:
