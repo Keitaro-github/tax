@@ -1,14 +1,20 @@
 import sys
-import csv
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QVBoxLayout, QHBoxLayout,
                              QRadioButton, QButtonGroup, QDateEdit, QMessageBox, QComboBox, QSpinBox)
 from PyQt6.QtGui import QRegularExpressionValidator
-from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtCore import QRegularExpression, pyqtSignal
+import socket
+import json
 
 
 class NewUserWindow(QWidget):
-    def __init__(self):
+    # Define the user_saved signal
+    user_saved = pyqtSignal()
+
+    def __init__(self, host, port):
         super().__init__()  # Initialize default constructor of parent class
+        self.host = host  # Define the host attribute
+        self.port = port  # Define the port attribute
 
         # Call PyQt6 API to set current window's title.
         self.setWindowTitle("New user")
@@ -261,46 +267,75 @@ class NewUserWindow(QWidget):
         else:
             self.__unexpected_error_message()
 
-        # Save data to CSV file
-        self.__save_to_csv(national_id, first_name, last_name, date_of_birth, gender, address_country, address_zip_code,
-                           address_city, address_street, address_house_number, phone_country_code, phone_number,
-                           marital_status)
+        # Call the function to save new user with the collected data
+        self.save_new_user_request(national_id, first_name, last_name, date_of_birth, gender, address_country,
+                                   address_zip_code, address_city, address_street, address_house_number,
+                                   phone_country_code, phone_number, marital_status)
 
-    def __save_to_csv(self, national_id, first_name, last_name, date_of_birth, gender, address_country,
-                      address_zip_code, address_city, address_street, address_house_number, phone_country_code,
-                      phone_number, marital_status):
+    def save_new_user_request(self, national_id, first_name, last_name, date_of_birth, gender, address_country,
+                              address_zip_code, address_city, address_street, address_house_number,
+                              phone_country_code, phone_number, marital_status):
+        try:
+            # Create a socket
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                # Connect to the server
+                client_socket.connect((self.host, self.port))
 
-        columns = ["national_id", "username", "password", "user_id", "first_name", "last_name", "date_of_birth",
-                   "gender", "address_country", "address_zip_code", "address_city", "address_street",
-                   "address_house_number", "phone_country_code", "phone_number", "marital_status"]
+                header_data = {
+                    "Content-Type": "application/json",
+                    "Encoding": "utf-8"
+                }
 
-        default_values = {"username": "", "password": "", "user_id": ""}
-        data_dict = {"national_id": national_id,
-                     "first_name": first_name,
-                     "last_name": last_name,
-                     "date_of_birth": date_of_birth,
-                     "gender": gender,
-                     "address_country": address_country,
-                     "address_zip_code": '*'+address_zip_code,
-                     "address_city": address_city,
-                     "address_street": address_street,
-                     "address_house_number": address_house_number,
-                     "phone_country_code": self.__extract_numeric_code(phone_country_code),
-                     "phone_number": phone_number,
-                     "marital_status": marital_status}
-        data_dict.update(default_values)
-        data = [data_dict[column] for column in columns]
+                request_data = {
+                    "command": "save_new_user",
+                    "national_id": national_id,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "date_of_birth": date_of_birth,
+                    "gender": gender,
+                    "address_country": address_country,
+                    "address_zip_code": address_zip_code,
+                    "address_city": address_city,
+                    "address_street": address_street,
+                    "address_house_number": address_house_number,
+                    "phone_country_code": phone_country_code,
+                    "phone_number": phone_number,
+                    "marital_status": marital_status
+                }
 
-        csv_file_path = r'C:\Users\serge\PycharmProjects\pythonProject\pet_projects\tax\Code\users.csv'
+                # Combine header and request data into a single dictionary
+                message = {
+                    "header": header_data,
+                    "request": request_data
+                }
 
-        with open(csv_file_path, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(data)
+                # Serialize the combined dictionary into JSON format
+                message_json = json.dumps(message)
 
-    def __extract_numeric_code(self, country_code):
-        # Extract the numeric part from the country code
-        numeric_code = country_code.split()[1]
-        return numeric_code
+                # Define a delimiter to mark the end of the message
+                delimiter = b'\r\n'
+
+                # Append the delimiter to the serialized message
+                message_json_with_delimiter = message_json.encode() + delimiter
+
+                # Send the JSON-formatted message over the socket
+                client_socket.sendall(message_json_with_delimiter)
+
+                response = client_socket.recv(1024).decode()
+
+                if response == "New user saved successfully":
+                    self.__saved_successfully_message()
+                    self.user_saved.emit()
+                    print("New user saved successfully")
+                elif response == "User was not saved :-(":
+                    self.__unexpected_error_message()
+                    print("User was not saved :-(")
+                else:
+                    print("Server response error 'here'")
+                    return False
+        except Exception as e:
+            print("Error", e)
+            return False
 
     def __enforce_min_length(self):
         sender_widget = self.sender()
@@ -336,11 +371,11 @@ class NewUserWindow(QWidget):
               :return: None
               """
 
-        # warning_dialog = QMessageBox(self)
-        # warning_dialog.setIcon(QMessageBox.Icon.Warning)
-        # warning_dialog.setWindowTitle("Data entered in wrong format")
-        # warning_dialog.setText("Some fields are missing information!\nPlease fill out empty fields.")
-        # warning_dialog.exec()
+        warning_dialog = QMessageBox(self)
+        warning_dialog.setIcon(QMessageBox.Icon.Warning)
+        warning_dialog.setWindowTitle("Data entered in wrong format")
+        warning_dialog.setText("Some fields are missing information!\nPlease fill out empty fields.")
+        warning_dialog.exec()
 
     def __unexpected_error_message(self):
         """
@@ -367,6 +402,16 @@ class NewUserWindow(QWidget):
 
 if __name__ == "__main__":
     application = QApplication(sys.argv)
-    user = NewUserWindow()
+    host = "127.0.0.1"
+    port = 65432
+    user = NewUserWindow(host, port)
+
+    # Define a slot to close the window
+    def close_window():
+        user.close()
+
+    # Connect the user_saved signal to the slot function
+    user.user_saved.connect(close_window)
+
     user.show()
     application.exec()

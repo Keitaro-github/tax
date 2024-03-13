@@ -1,11 +1,11 @@
 import random
-import database_services
+from Code import database_services
 import datetime
 import os
 import socket
+import json
 
-
-file_name = None    
+file_name = None
 terminal = False
 history = False
 
@@ -27,8 +27,7 @@ def create_history_file():
     if not os.path.isdir(cache_folder):
         # Create cache folder on PC for storing all histories.
         os.mkdir(cache_folder)
-    # Create absolute history filename based on full path to cache folder
-    # and history filename.
+    # Create absolute history filename based on full path to cache folder and history filename.
     file_name = os.path.join(cache_folder, 'History_' + file_timestamp + '.txt')
 
     with open(file_name, 'w') as history_file:
@@ -56,7 +55,6 @@ def write_history_file(message):
     return True
 
 
-# def output(message, terminal=True, history=True):
 def output(message):
     if terminal is True:
         print(message)
@@ -191,12 +189,6 @@ def add_user():
 
 
 def credential_check(username, password):
-    # username = input('\n' + 'Enter your username and press "Enter": ')
-    # # output(f"Register your username and press <Enter> \n {username}", terminal=False)
-    # output(f"Register your username and press <Enter> \n {username}")
-    # password_input = getpass.getpass('Enter your password and press <Enter>: ')
-    # # output(f"Enter your password and press <Enter>: \n", terminal=False)
-    # output(f"Enter your password and press <Enter>: \n")
 
     user_list = database_services.read_csv()
     for user in user_list:
@@ -290,32 +282,58 @@ def generate_password():
     return password
 
 
-class SignInServices:
-    def __init__(self, host, port):
+class Client:
+    def __init__(self, host, port, username=None, password=None):
         self.host = host  # The server's hostname or IP address
         self.port = port  # The port used by the server
-        self.__username = None
-        self.__password = None
+        self.__username = username
+        self.__password = password
 
-    def __create_socket(self):
+    def send_request(self):
         """
-        Create socket for communicating with TMS server.
-        :return: response if success, None otherwise
+        Encode message and send to server
+        :return: True if password and name matches, False otherwise
         """
-
-        if self.__username is None or self.__password is None:
-            return None
-
-        credentials = f"{self.__username}|{self.__password}".encode()
-
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
             client_socket.connect((self.host, self.port))
-            client_socket.sendall(credentials)
-            response = client_socket.recv(1024)
 
-        if response != credentials:
-            response = None
-        return response
+            header_data = {
+                "Content-Type": "application/json",
+                "Encoding": "utf-8"
+            }
+
+            request_data = {
+                "command": "login_request",
+                "username": self.__username,
+                "password": self.__password
+            }
+
+            # Combine header and request data into a single dictionary
+            message = {
+                "header": header_data,
+                "request": request_data
+            }
+
+            # Serialize the combined dictionary into JSON format
+            message_json = json.dumps(message)
+
+            # Define a delimiter to mark the end of the message
+            delimiter = b'\r\n'
+
+            # Append the delimiter to the serialized message
+            message_json_with_delimiter = message_json.encode() + delimiter
+
+            # Send the JSON-formatted message over the socket
+            client_socket.sendall(message_json_with_delimiter)
+
+            response = client_socket.recv(1024).decode()
+
+            if response == "User logged in successfully":
+                return True
+            elif response == "User was not logged in :-(":
+                return False
+            else:
+                print("Server response error")
 
     def set_port(self, number):
         """
@@ -352,7 +370,7 @@ class SignInServices:
         self.__username = username
         self.__password = password
 
-        data = self.__create_socket()
+        data = self.__send_request()
         if data is None:
             return False
         return True

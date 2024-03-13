@@ -7,8 +7,10 @@ from PyQt6.QtCore import QTimer
 
 
 class SignInWindow(QWidget):
-    def __init__(self):
+    def __init__(self, host, port):
         super().__init__()  # Initialize default constructor of parent class
+        self.host = host  # Define the host attribute
+        self.port = port  # Define the port attribute
 
         # Call PyQt6 API to set current window's title.
         self.setWindowTitle("Sign In")
@@ -131,8 +133,8 @@ class SignInWindow(QWidget):
 
         self.__button_clicked = True
 
-        sign_in_services = signin_services.SignInServices("127.0.0.1", 65432)
-        result = sign_in_services.check_credentials(username, password)
+        sign_in_services = signin_services.Client(self.host, self.port, username, password)
+        result = sign_in_services.send_request()
 
         if result is True:
             self.__sign_in_success_message()
@@ -142,12 +144,7 @@ class SignInWindow(QWidget):
             command = f"python {filename} {username} {password}"
             os.system(command)
 
-        elif not username and not password:
-            if self.__button_clicked:
-                self.__attempt_count += 1
-                self.__sign_in_credentials_missing_message()
-
-        else:
+        elif result is False:
             self.__attempt_count += 1
             self.__sign_in_failure_message()
 
@@ -235,6 +232,8 @@ class SignInWindow(QWidget):
 
 if __name__ == "__main__":
     application = QApplication(sys.argv)
-    signin_window = SignInWindow()
+    host = "127.0.0.1"
+    port = 65432
+    signin_window = SignInWindow(host, port)
     signin_window.show()
     application.exec()
