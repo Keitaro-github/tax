@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QCheckBox, QVBoxLayout, QHBoxLayout,
                              QMessageBox)
 import tax.Code.signin_services as signin_services
@@ -6,8 +7,10 @@ from PyQt6.QtCore import QTimer
 
 
 class SignInWindow(QWidget):
-    def __init__(self):
+    def __init__(self, host, port):
         super().__init__()  # Initialize default constructor of parent class
+        self.host = host  # Define the host attribute
+        self.port = port  # Define the port attribute
 
         # Call PyQt6 API to set current window's title.
         self.setWindowTitle("Sign In")
@@ -97,7 +100,7 @@ class SignInWindow(QWidget):
     def __session_timeout(self):
         self.__sign_in_time_out_message()
         self.__timer.stop()
-        print("Time out!")
+        self.close()
 
     def __click_hide_checkbox(self):
         """
@@ -117,6 +120,7 @@ class SignInWindow(QWidget):
         :return: None
         :rtype:
         """
+
         self.__timer.start(180000)
 
         # Attempts limit check
@@ -127,20 +131,20 @@ class SignInWindow(QWidget):
         username = self.__username_edit.text()
         password = self.__password_edit.text()
 
-        print(f"Entered username: {username}")
-        print(f"Entered password: {password}")
-
         self.__button_clicked = True
 
-        if signin_services.credential_check(username, password):
+        sign_in_services = signin_services.Client(self.host, self.port, username, password)
+        result = sign_in_services.send_request()
+
+        if result is True:
             self.__sign_in_success_message()
+            self.close()
 
-        elif not username and not password:
-            if self.__button_clicked:
-                self.__attempt_count += 1
-                self.__sign_in_credentials_missing_message()
+            filename = os.getcwd() + '/' + "ui/ui_tms_main_window.py"
+            command = f"python {filename} {username} {password}"
+            os.system(command)
 
-        else:
+        elif result is False:
             self.__attempt_count += 1
             self.__sign_in_failure_message()
 
@@ -158,9 +162,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_success_message(self):
         """
-              This message is intended to be called automatically when the user successfully signs in.
-              :return: None
-              """
+        This message is intended to be called automatically when the user successfully signs in.
+        :return: None
+        """
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Sign in successful")
         confirmation_dialog.setText("You have successfully signed in!")
@@ -168,9 +172,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_failure_message(self):
         """
-              This message is intended to be called automatically when the user unsuccessfully tries to sign in.
-              :return: None
-              """
+        This message is intended to be called automatically when the user unsuccessfully tries to sign in.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -180,10 +184,10 @@ class SignInWindow(QWidget):
 
     def __sign_in_credentials_missing_message(self):
         """
-              This message is intended to be called automatically when the user tries to sign in without entering
-              credentials.
-              :return: None
-              """
+        This message is intended to be called automatically when the user tries to sign in without entering
+        credentials.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -193,9 +197,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_attempts_limit_message(self):
         """
-              This message is intended to be called automatically when the user reaches sign in attempts limit.
-              :return: None
-              """
+        This message is intended to be called automatically when the user reaches sign in attempts limit.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)
@@ -210,9 +214,9 @@ class SignInWindow(QWidget):
 
     def __sign_in_time_out_message(self):
         """
-              This message is intended to be called automatically when the time for sing in runs out.
-              :return: None
-              """
+        This message is intended to be called automatically when the time for sing in runs out.
+        :return: None
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)
@@ -228,6 +232,8 @@ class SignInWindow(QWidget):
 
 if __name__ == "__main__":
     application = QApplication(sys.argv)
-    signin_window = SignInWindow()
+    host = "127.0.0.1"
+    port = 65432
+    signin_window = SignInWindow(host, port)
     signin_window.show()
     application.exec()
