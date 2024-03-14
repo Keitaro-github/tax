@@ -1,3 +1,5 @@
+# Credentials check program
+# Variant 3: "Range function"
 import random
 from Code import database_services
 import datetime
