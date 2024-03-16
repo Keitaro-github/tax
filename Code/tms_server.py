@@ -1,4 +1,5 @@
 import os
+import sys
 import database_services
 import socket
 import json
@@ -87,7 +88,13 @@ class Server:
             request_data = json.loads(message_data)
             print("Parsed request data:", request_data)  # Debugging statement
 
-            command = request_data["request"].get("command")
+            try:
+                command = request_data["request"].get("command")
+            except KeyError:
+                print("Could not handle request.")
+                client_socket.close()
+                return
+
             if command == "login_request":
                 username = request_data["request"].get("username")
                 password = request_data["request"].get("password")
@@ -247,21 +254,45 @@ class Server:
         data = [data_dict[column] for column in columns]
 
         csv_file_path = os.path.join(os.getcwd(), "users.csv")
+        if os.path.isfile(csv_file_path) is False:
+            print("CSV file does not exist.")
+            return False
 
-        with open(csv_file_path, mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(data)
+        try:
+            with open(csv_file_path, mode='a', newline='') as csv_file:
+                writer = csv.writer(csv_file)
+                writer.writerow(data)
+        except OSError:
+            print("Could not open CSV file.")
+            return False
+
+        return True
 
     def __extract_numeric_code(self, country_code):
         # Extract the numeric part from the country code
         numeric_code = country_code.split()[1]
         return numeric_code
 
+
 if __name__ == '__main__':
-    sign_in_services = Server("127.0.0.1", 65432, new_user_window_instance=None)
+    try:
+        with open("configs/tcp_config.json", 'r') as tcp_config_file:
+            tcp_configs = json.loads(tcp_config_file.read())
+    except OSError:
+        print("Could not get TCP configs. Please, check Code/configs/tcp_config.json file")
+        sys.exit(1)
+
+    try:
+        host = tcp_configs["host"]
+        port = tcp_configs["port"]
+    except KeyError as exception:
+        print(exception)
+        sys.exit(1)
+
+    sign_in_services = Server(host, port, new_user_window_instance=None)
 
     while True:
         client_socket, client_address = sign_in_services.server_socket.accept()
         print("Connected client:", client_address)
         sign_in_services.handle_request(client_socket)
-    sys.exit(0)
+        sys.exit(0)
