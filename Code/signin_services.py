@@ -296,46 +296,51 @@ class Client:
         Encode message and send to server
         :return: True if password and name matches, False otherwise
         """
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-            client_socket.connect((self.host, self.port))
 
-            header_data = {
-                "Content-Type": "application/json",
-                "Encoding": "utf-8"
-            }
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                client_socket.connect((self.host, self.port))
+        except ConnectionRefusedError:
+            print("Could not establish TCP connection.")
+            return False
 
-            request_data = {
-                "command": "login_request",
-                "username": self.__username,
-                "password": self.__password
-            }
+        header_data = {
+            "Content-Type": "application/json",
+            "Encoding": "utf-8"
+        }
 
-            # Combine header and request data into a single dictionary
-            message = {
-                "header": header_data,
-                "request": request_data
-            }
+        request_data = {
+            "command": "login_request",
+            "username": self.__username,
+            "password": self.__password
+        }
 
-            # Serialize the combined dictionary into JSON format
-            message_json = json.dumps(message)
+        # Combine header and request data into a single dictionary
+        message = {
+            "header": header_data,
+            "request": request_data
+        }
 
-            # Define a delimiter to mark the end of the message
-            delimiter = b'\r\n'
+        # Serialize the combined dictionary into JSON format
+        message_json = json.dumps(message)
 
-            # Append the delimiter to the serialized message
-            message_json_with_delimiter = message_json.encode() + delimiter
+        # Define a delimiter to mark the end of the message
+        delimiter = b'\r\n'
 
-            # Send the JSON-formatted message over the socket
-            client_socket.sendall(message_json_with_delimiter)
+        # Append the delimiter to the serialized message
+        message_json_with_delimiter = message_json.encode() + delimiter
 
-            response = client_socket.recv(1024).decode()
+        # Send the JSON-formatted message over the socket
+        client_socket.sendall(message_json_with_delimiter)
 
-            if response == "User logged in successfully":
-                return True
-            elif response == "User was not logged in :-(":
-                return False
-            else:
-                print("Server response error")
+        response = client_socket.recv(1024).decode()
+
+        if response == "User logged in successfully":
+            return True
+        elif response == "User was not logged in :-(":
+            return False
+        else:
+            print("Server response error")
 
     def set_port(self, number):
         """
