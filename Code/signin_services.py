@@ -4,6 +4,8 @@ import datetime
 import os
 import socket
 import json
+import sqlite3
+import bcrypt
 
 file_name = None
 terminal = False
@@ -188,13 +190,25 @@ def add_user():
     database_services.rewrite_csv(user_list)
 
 
+def connect_to_database(taxpayers):
+    conn = sqlite3.connect(taxpayers)
+    cursor = conn.cursor()
+    return conn, cursor
+
+
 def credential_check(username, password):
 
-    user_list = database_services.read_csv()
-    for user in user_list:
-        if username == user['username'] and password == user['password']:
-            return True
-    return False
+    conn, cursor = connect_to_database("taxpayers.db")
+
+    # Hash the input password using bcrypt
+    hashed_password = bcrypt.hashpw(password.encode().bcrypt.gensalt())
+
+    cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username,
+                                                                               hashed_password))
+    result = cursor.fetchone()
+
+    conn.close()
+    return len(result) > 0
 
 
 def sign_in():  # Works only under debug mode due to implemented feature of hidden password.
@@ -357,20 +371,4 @@ class Client:
         if type(address) is not str:
             return False
         self.host = address
-        return True
-
-    def check_credentials(self, username, password):
-        """
-        Check whether provided credentials are valid
-        :param username: username
-        :param password: password
-        :return: True if credentials are valid, False otherwise
-        """
-
-        self.__username = username
-        self.__password = password
-
-        data = self.__send_request()
-        if data is None:
-            return False
         return True
