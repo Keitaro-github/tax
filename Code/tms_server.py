@@ -1,4 +1,5 @@
 import sys
+import os
 import database_services
 import socket
 import json
@@ -248,7 +249,7 @@ class Server:
                 client_socket.sendall(response_message.encode())
                 
         except Exception as e:
-            print("Error processing request:", e)
+            print(" Error processing request:", e)
         finally:
             client_socket.close()
 
@@ -318,11 +319,10 @@ if __name__ == '__main__':
         print(exception)
         sys.exit(1)
 
-    sign_in_services = Server(host, port, new_user_window_instance=None)
+    tms_server = Server(host, port, new_user_window_instance=None)
 
     while True:
-        client_socket, client_address = sign_in_services.server_socket.accept()
-        print("Connected client:", client_address)
-        sign_in_services.handle_request(client_socket)
+        client_socket, client_address = tms_server.server_socket.accept()
+        print("Connected TMS client:", client_address)
+        tms_server.handle_request(client_socket)
     sys.exit(0)
-
