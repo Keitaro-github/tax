@@ -1,15 +1,16 @@
 # Credentials check program
 # Variant 3: "Range function"
 import random
-import getpass
-import Code.database_services as database_services
+from Code import database_services
 import datetime
 import os
+import socket
+import json
 
-
-file_name = None    
+file_name = None
 terminal = False
 history = False
+
 
 def create_history_file():
     global file_name
@@ -28,8 +29,7 @@ def create_history_file():
     if not os.path.isdir(cache_folder):
         # Create cache folder on PC for storing all histories.
         os.mkdir(cache_folder)
-    # Create absolute history filename based on full path to cache folder
-    # and history filename.
+    # Create absolute history filename based on full path to cache folder and history filename.
     file_name = os.path.join(cache_folder, 'History_' + file_timestamp + '.txt')
 
     with open(file_name, 'w') as history_file:
@@ -57,7 +57,6 @@ def write_history_file(message):
     return True
 
 
-# def output(message, terminal=True, history=True):
 def output(message):
     if terminal is True:
         print(message)
@@ -100,7 +99,6 @@ def delete_user(id_num):
         output(f"User with ID {id_num} has been deleted")
         database_services.rewrite_csv(user_list)
         return user_list
-        # How to write an updated list back to csv.file?
     else:
         print('The user with such ID was not found.')
         write_history_file('The user with such ID was not found.\n')
@@ -193,13 +191,6 @@ def add_user():
 
 
 def credential_check(username, password):
-    # username = input('\n' + 'Enter your username and press "Enter": ')
-    # # output(f"Register your username and press <Enter> \n {username}", terminal=False)
-    # output(f"Register your username and press <Enter> \n {username}")
-    # password_input = getpass.getpass('Enter your password and press <Enter>: ')
-    # # output(f"Enter your password and press <Enter>: \n", terminal=False)
-    # output(f"Enter your password and press <Enter>: \n")
-
 
     user_list = database_services.read_csv()
     for user in user_list:
@@ -291,3 +282,97 @@ def generate_password():
         else:
             continue
     return password
+
+
+class Client:
+    def __init__(self, host, port, username=None, password=None):
+        self.host = host  # The server's hostname or IP address
+        self.port = port  # The port used by the server
+        self.__username = username
+        self.__password = password
+
+    def send_request(self):
+        """
+        Encode message and send to server
+        :return: True if password and name matches, False otherwise
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.connect((self.host, self.port))
+
+            header_data = {
+                "Content-Type": "application/json",
+                "Encoding": "utf-8"
+            }
+
+            request_data = {
+                "command": "login_request",
+                "username": self.__username,
+                "password": self.__password
+            }
+
+            # Combine header and request data into a single dictionary
+            message = {
+                "header": header_data,
+                "request": request_data
+            }
+
+            # Serialize the combined dictionary into JSON format
+            message_json = json.dumps(message)
+
+            # Define a delimiter to mark the end of the message
+            delimiter = b'\r\n'
+
+            # Append the delimiter to the serialized message
+            message_json_with_delimiter = message_json.encode() + delimiter
+
+            # Send the JSON-formatted message over the socket
+            client_socket.sendall(message_json_with_delimiter)
+
+            response = client_socket.recv(1024).decode()
+
+            if response == "User logged in successfully":
+                return True
+            elif response == "User was not logged in :-(":
+                return False
+            else:
+                print("Server response error")
+
+    def set_port(self, number):
+        """
+        Assign port number to port attribute
+        :param number: port number
+        :return: True if port is set successfully, False otherwise
+        """
+
+        if type(number) is not int:
+            return False
+        self.port = number
+        return True
+
+    def set_host(self, address):
+        """
+        Assign IP address to host attribute
+        :param address: address number
+        :return: True if host is set successfully, False otherwise
+        """
+
+        if type(address) is not str:
+            return False
+        self.host = address
+        return True
+
+    def check_credentials(self, username, password):
+        """
+        Check whether provided credentials are valid
+        :param username: username
+        :param password: password
+        :return: True if credentials are valid, False otherwise
+        """
+
+        self.__username = username
+        self.__password = password
+
+        data = self.__send_request()
+        if data is None:
+            return False
+        return True
