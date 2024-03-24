@@ -133,6 +133,7 @@ class Server:
                     # Create response using the same username and password divided by | symbol
                     response = "User logged in successfully"
                     client_socket.sendall(response.encode())
+                    print(response)
                 else:
                     response = "User was not logged in :-("
                     client_socket.sendall(response.encode())

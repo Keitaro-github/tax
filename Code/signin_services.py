@@ -312,47 +312,47 @@ class Client:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
                 client_socket.connect((self.host, self.port))
+
+                header_data = {
+                    "Content-Type": "application/json",
+                    "Encoding": "utf-8"
+                }
+
+                request_data = {
+                    "command": "login_request",
+                    "username": self.__username,
+                    "password": self.__password
+                }
+
+                # Combine header and request data into a single dictionary
+                message = {
+                    "header": header_data,
+                    "request": request_data
+                }
+
+                # Serialize the combined dictionary into JSON format
+                message_json = json.dumps(message)
+
+                # Define a delimiter to mark the end of the message
+                delimiter = b'\r\n'
+
+                # Append the delimiter to the serialized message
+                message_json_with_delimiter = message_json.encode() + delimiter
+
+                # Send the JSON-formatted message over the socket
+                client_socket.sendall(message_json_with_delimiter)
+
+                response = client_socket.recv(1024).decode()
+
+                if response == "User logged in successfully":
+                    return True
+                elif response == "User was not logged in :-(":
+                    return False
+                else:
+                    print("Server response error")
         except ConnectionRefusedError:
             print("Could not establish TCP connection.")
             return False
-
-        header_data = {
-            "Content-Type": "application/json",
-            "Encoding": "utf-8"
-        }
-
-        request_data = {
-            "command": "login_request",
-            "username": self.__username,
-            "password": self.__password
-        }
-
-        # Combine header and request data into a single dictionary
-        message = {
-            "header": header_data,
-            "request": request_data
-        }
-
-        # Serialize the combined dictionary into JSON format
-        message_json = json.dumps(message)
-
-        # Define a delimiter to mark the end of the message
-        delimiter = b'\r\n'
-
-        # Append the delimiter to the serialized message
-        message_json_with_delimiter = message_json.encode() + delimiter
-
-        # Send the JSON-formatted message over the socket
-        client_socket.sendall(message_json_with_delimiter)
-
-        response = client_socket.recv(1024).decode()
-
-        if response == "User logged in successfully":
-            return True
-        elif response == "User was not logged in :-(":
-            return False
-        else:
-            print("Server response error")
 
     def set_port(self, number):
         """
