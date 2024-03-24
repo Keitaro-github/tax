@@ -3,6 +3,7 @@ import database_services
 
 signin_services.create_history_file()
 
+
 menu = 'Welcome to Tax Management System!'  \
        '\n\n MENU'                          \
        '\n 1. Sign in'                      \
@@ -26,7 +27,6 @@ operations = {
       6: 'Find user',
       0: 'Exit operation',
 }
-
 
 while True:
     try:
