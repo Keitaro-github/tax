@@ -186,9 +186,9 @@ class TMSMainWindow(QWidget):
                 address_text = (f"{address_street} {address_house_number}, {address_zip_code} {address_city}, "
                                 f"{address_country}")
                 self.label_address.setText(f"Address: {address_text}")
-                phone_country = user_details.get('phone_country', '')
+                phone_country_code = user_details.get('phone_country_code', '')
                 phone_number = user_details.get('phone_number', '')
-                phone_text = f"+{phone_country} {phone_number}"
+                phone_text = f"+{phone_country_code} {phone_number}"
                 self.label_phone_number.setText(f"Phone number: {phone_text}")
                 self.label_marital_status.setText(f"Marital status: {user_details['marital_status']}")
                 self.label_tax_rate.setText(f"Tax rate: {user_details['tax_rate']}")

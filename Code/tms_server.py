@@ -1,9 +1,11 @@
-import os
 import sys
 import database_services
 import socket
 import json
 import csv
+import sqlite3
+import bcrypt
+import sys
 from PyQt6.QtCore import QDate
 
 
@@ -13,7 +15,8 @@ class Server:
         self.port = port  # The port used by the server
         self.__username = None
         self.__password = None
-        self.new_user_window_instance = new_user_window_instance  # Store the instance of NewUserWindow
+        # Store the instance of NewUserWindow
+        self.new_user_window_instance = new_user_window_instance
 
         # Bind the server socket
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -32,22 +35,41 @@ class Server:
     def parse_header(self, header_data):
         return json.loads(header_data)
 
+    def connect_to_database(self, db_file):
+        # Get the absolute path to the directory containing the script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Construct the absolute path to the database file using the script directory
+        db_path = os.path.join(script_dir, 'database', db_file)
+        # Connect to the SQLite database
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        return conn, cursor
+
     def __check_credentials(self, username, password):
-        """
-        Check whether provided credentials are valid
-        :param username: username
-        :param password: password
-        :return: True if credentials are valid, False otherwise
-        """
+        conn, cursor = self.connect_to_database("taxpayers.db")
 
-        self.__username = username
-        self.__password = password
+        # Retrieve the hashed password from the database for the given username
+        cursor.execute("SELECT password FROM tms_users WHERE username = ?", (username,))
+        stored_hashed_password = cursor.fetchone()
+        print("Stored hashed password:", stored_hashed_password)
+        print("Password:", password.encode('utf-8'))
 
-        user_list = database_services.read_csv()
-        for user in user_list:
-            if self.__username == user['username'] and self.__password == user['password']:
+        if stored_hashed_password is not None:
+            # Retrieve the stored hashed password
+            stored_hashed_password = stored_hashed_password[0]
+
+            # Check if the entered password matches the stored hashed password
+            if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
+                # Passwords match
                 return True
-        return False
+            else:
+                # Passwords don't match
+                return False
+        else:
+            # No user found with the given username
+            return False
+
+        conn.close()
 
     def recv_until(self, client_socket, delimiter):
         data = b''
@@ -59,23 +81,29 @@ class Server:
             data += chunk
         return data
 
-    def __search_csv(self, national_id=None, first_name=None, last_name=None, date_of_birth=None):
-        csv_file_path = os.path.join(os.getcwd(), "users.csv")
+    def __retrieve_user_details(self, national_id):
+        conn, cursor = self.connect_to_database("taxpayers.db")
+        cursor.execute("""
+            SELECT * 
+            FROM personal_info 
+            JOIN contact_info ON personal_info.national_id = contact_info.national_id 
+            JOIN tax_info ON personal_info.national_id = tax_info.national_id 
+            WHERE personal_info.national_id = ?
+            """, (national_id,))
+        search_results = cursor.fetchall()
+        print("Retrieve_user_details:", search_results)
+        conn.close()
+        return search_results
 
-        search_results = []
+    def __search_personal_info(self, national_id, first_name, last_name, date_of_birth):
+        conn, cursor = self.connect_to_database("taxpayers.db")
 
-        with open(csv_file_path, newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                if (
-                        (national_id == row["national_id"]) or
-                        (first_name and first_name.lower() == row["first_name"].lower()) or
-                        (last_name and last_name.lower() == row["last_name"].lower()) or
-                        (date_of_birth != QDate.currentDate().toString("dd.MM.yyyy") and
-                         date_of_birth == row["date_of_birth"])):
-                        search_results.append(row)
-
-        print("Search from csv:", search_results)
+        # Search for user match in personal_info table
+        cursor.execute("SELECT * FROM personal_info WHERE national_id = ? OR first_name = ? OR last_name "
+                       "= ? OR date_of_birth = ?", (national_id, first_name, last_name, date_of_birth))
+        search_results = cursor.fetchall()
+        print("Search_results:", search_results)
+        conn.close()
         return search_results
 
     def handle_request(self, client_socket):
@@ -135,8 +163,8 @@ class Server:
                 last_name = request_data["request"].get("last_name")
                 date_of_birth = request_data["request"].get("date_of_birth")
 
-                search_results = self.__search_csv(national_id, first_name, last_name, date_of_birth)
-                if search_results is None:
+                search_results = self.__search_personal_info(national_id, first_name, last_name, date_of_birth)
+                if search_results is None or len(search_results) == 0:
                        response_data = {"command": "search_unsuccessful"}
 
                 else:
@@ -144,10 +172,10 @@ class Server:
 
                     for user in search_results:
                         limited_user_info = {
-                            "national_id": user["national_id"],
-                            "first_name": user["first_name"],
-                            "last_name": user["last_name"],
-                            "date_of_birth": user["date_of_birth"]
+                            "national_id": user[0],
+                            "first_name": user[1],
+                            "last_name": user[2],
+                            "date_of_birth": user[3]
                         }
                         # Append user details to the list
                         user_info_list.append(limited_user_info)
@@ -171,7 +199,7 @@ class Server:
             if command == "retrieve_user_details":
                 national_id = request_data["request"].get("national_id")
 
-                search_results = self.__search_csv(national_id)
+                search_results = self.__retrieve_user_details(national_id)
                 if search_results is None:
                     # If no user found, send an unsuccessful search response
                     response_data = {"command": "retrieving_unsuccessful"}
@@ -181,28 +209,29 @@ class Server:
 
                     for user_info in search_results:
                         complete_user_info = {
-                            "national_id": user_info["national_id"],
-                            "first_name": user_info["first_name"],
-                            "last_name": user_info["last_name"],
-                            "date_of_birth": user_info["date_of_birth"],
-                            "gender": user_info["gender"],
-                            "address_country": user_info["address_country"],
-                            "address_zip_code": user_info["address_zip_code"],
-                            "address_city": user_info["address_city"],
-                            "address_street": user_info["address_street"],
-                            "address_house_number": user_info["address_house_number"],
-                            "phone_country_code": user_info["phone_country"],
-                            "phone_number": user_info["phone_number"],
-                            "marital_status": user_info["marital_status"],
-                            "tax_rate": user_info["tax_rate"],
-                            "yearly_income": user_info["yearly_income"],
-                            "advance_tax": user_info["advance_tax"],
-                            "tax_paid_this_year": user_info["tax_paid_this_year"],
-                            "property_value": user_info["property_value"],
-                            "loans": user_info["loans"],
-                            "property_tax": user_info["property_tax"]
+                            "national_id": user_info[0],
+                            "first_name": user_info[1],
+                            "last_name": user_info[2],
+                            "date_of_birth": user_info[3],
+                            "gender": user_info[4],
+                            "address_country": user_info[6],
+                            "address_zip_code": user_info[7],
+                            "address_city": user_info[8],
+                            "address_street": user_info[9],
+                            "address_house_number": user_info[10],
+                            "phone_country_code": user_info[11],
+                            "phone_number": user_info[12],
+                            "marital_status": user_info[14],
+                            "tax_rate": user_info[15],
+                            "yearly_income": user_info[16],
+                            "advance_tax": user_info[17],
+                            "tax_paid_this_year": user_info[18],
+                            "property_value": user_info[19],
+                            "loans": user_info[20],
+                            "property_tax": user_info[21],
                         }
                         complete_user_info_list.append(complete_user_info)
+                        print("Complete_user_info_list", complete_user_info_list)
 
                     response_data = {
                         "command": "retrieving_successful",
@@ -295,4 +324,5 @@ if __name__ == '__main__':
         client_socket, client_address = sign_in_services.server_socket.accept()
         print("Connected client:", client_address)
         sign_in_services.handle_request(client_socket)
-        sys.exit(0)
+    sys.exit(0)
+
