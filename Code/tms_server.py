@@ -5,7 +5,7 @@ import json
 import csv
 import sqlite3
 import bcrypt
-import sys
+import os
 from PyQt6.QtCore import QDate
 
 
