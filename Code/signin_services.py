@@ -1,11 +1,11 @@
-# Credentials check program
-# Variant 3: "Range function"
 import random
-from Code import database_services
 import datetime
 import os
 import socket
 import json
+import sqlite3
+import bcrypt
+from Code import database_services
 
 file_name = None
 terminal = False
@@ -190,13 +190,25 @@ def add_user():
     database_services.rewrite_csv(user_list)
 
 
+def connect_to_database(taxpayers):
+    conn = sqlite3.connect(taxpayers)
+    cursor = conn.cursor()
+    return conn, cursor
+
+
 def credential_check(username, password):
 
-    user_list = database_services.read_csv()
-    for user in user_list:
-        if username == user['username'] and password == user['password']:
-            return True
-    return False
+    conn, cursor = connect_to_database("taxpayers.db")
+
+    # Hash the input password using bcrypt
+    hashed_password = bcrypt.hashpw(password.encode().bcrypt.gensalt())
+
+    cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username,
+                                                                               hashed_password))
+    result = cursor.fetchone()
+
+    conn.close()
+    return len(result) > 0
 
 
 def sign_in():  # Works only under debug mode due to implemented feature of hidden password.
@@ -296,46 +308,51 @@ class Client:
         Encode message and send to server
         :return: True if password and name matches, False otherwise
         """
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-            client_socket.connect((self.host, self.port))
 
-            header_data = {
-                "Content-Type": "application/json",
-                "Encoding": "utf-8"
-            }
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+                client_socket.connect((self.host, self.port))
 
-            request_data = {
-                "command": "login_request",
-                "username": self.__username,
-                "password": self.__password
-            }
+                header_data = {
+                    "Content-Type": "application/json",
+                    "Encoding": "utf-8"
+                }
 
-            # Combine header and request data into a single dictionary
-            message = {
-                "header": header_data,
-                "request": request_data
-            }
+                request_data = {
+                    "command": "login_request",
+                    "username": self.__username,
+                    "password": self.__password
+                }
 
-            # Serialize the combined dictionary into JSON format
-            message_json = json.dumps(message)
+                # Combine header and request data into a single dictionary
+                message = {
+                    "header": header_data,
+                    "request": request_data
+                }
 
-            # Define a delimiter to mark the end of the message
-            delimiter = b'\r\n'
+                # Serialize the combined dictionary into JSON format
+                message_json = json.dumps(message)
 
-            # Append the delimiter to the serialized message
-            message_json_with_delimiter = message_json.encode() + delimiter
+                # Define a delimiter to mark the end of the message
+                delimiter = b'\r\n'
 
-            # Send the JSON-formatted message over the socket
-            client_socket.sendall(message_json_with_delimiter)
+                # Append the delimiter to the serialized message
+                message_json_with_delimiter = message_json.encode() + delimiter
 
-            response = client_socket.recv(1024).decode()
+                # Send the JSON-formatted message over the socket
+                client_socket.sendall(message_json_with_delimiter)
 
-            if response == "User logged in successfully":
-                return True
-            elif response == "User was not logged in :-(":
-                return False
-            else:
-                print("Server response error")
+                response = client_socket.recv(1024).decode()
+
+                if response == "User logged in successfully":
+                    return True
+                elif response == "User was not logged in :-(":
+                    return False
+                else:
+                    print("Server response error")
+        except ConnectionRefusedError:
+            print("Could not establish TCP connection.")
+            return False
 
     def set_port(self, number):
         """
@@ -359,20 +376,4 @@ class Client:
         if type(address) is not str:
             return False
         self.host = address
-        return True
-
-    def check_credentials(self, username, password):
-        """
-        Check whether provided credentials are valid
-        :param username: username
-        :param password: password
-        :return: True if credentials are valid, False otherwise
-        """
-
-        self.__username = username
-        self.__password = password
-
-        data = self.__send_request()
-        if data is None:
-            return False
         return True
