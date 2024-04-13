@@ -8,8 +8,30 @@ from PyQt6.QtCore import pyqtSignal
 
 
 class TMSMainWindow(QWidget):
+    """
+    Represents the main window of the Tax Management System (TMS) application, created using PyQt6 for user interaction
+    with the GUI.
+
+    Attributes:
+        username (str): The username of the TMS user.
+        password (int): The password of the TMS user.
+        host (str): The hostname or IP address of the server to connect to.
+        port (int): The port used by the server for the connection.
+        main_layout (QVBoxLayout): A layout widget for organizing GUI components.
+        user_details_retrieved_signal (pyqtSignal): A signal emitted when user details are retrieved.
+    """
+
     user_details_retrieved_signal = pyqtSignal(dict)
     def __init__(self, username, password, host, port):
+        """
+        Initializes a new instance of the TMSMainWindow class.
+
+        Args:
+            username (str): The username of the TMS user.
+            password (int): The password of the TMS user.
+            host (str): The server's hostname or IP address to connect to.
+            port (int): The port used by the server to connect to.
+        """
         super().__init__()
 
         self.__username = username
@@ -145,8 +167,7 @@ class TMSMainWindow(QWidget):
 
     def __show_new_user_window(self):
         """
-        Show NewUserWindow UI to create new user.
-        :return: None
+        Displays NewUserWindow UI to create new user.
         """
 
         self.__new_user_window = NewUserWindow(self.host, self.port)
@@ -154,20 +175,15 @@ class TMSMainWindow(QWidget):
 
     def __show_find_user_window(self):
         """
-        Show FindUserWindow UI to find user.
-        :return: None
+        Displays FindUserWindow UI to find user.
         """
 
         self.__find_user_window = FindUserWindow(self.host, self.port, main_window=self)
         self.__find_user_window.show()
 
-    def update_main_window(self, user_details):
-        # Define what happens when the request is complete
-        self.populate_user_information(user_details)
-
     def populate_user_information(self, user_details):
         """
-        Populate the main window with the retrieved user information.
+        Populates the main window with the retrieved user information.
         """
         print("Received user details:", user_details)
         try:
@@ -202,8 +218,8 @@ class TMSMainWindow(QWidget):
                 print("User information populated successfully.")  # Debugging output
             else:
                 print("User details are None. Unable to populate information.")  # Debugging output
-        except Exception as e:
-            print("Error while populating user information:", e)  # Error handling
+        except Exception as exception:
+            print("Error while populating user information:", exception)  # Error handling
 
 
 if __name__ == "__main__":

@@ -8,6 +8,15 @@ from PyQt6.QtCore import QTimer
 
 
 class SignInWindow(QWidget):
+    """
+    Represents the sign in window of the Tax Management System (TMS) application, created using PyQt6 for user
+    interaction with the GUI.
+
+    Attributes:
+        host (str): The hostname or IP address of the server to connect to.
+        port (int): The port used by the server for the connection.
+        __main_layout (QVBoxLayout): A layout widget for organizing GUI components.
+    """
     def __init__(self, host, port):
         super().__init__()  # Initialize default constructor of parent class
         self.host = host  # Define the host attribute
@@ -27,14 +36,12 @@ class SignInWindow(QWidget):
 
     def __init_ui(self):
         """
-        This function is intended to create all UI components.
-        :return: None
-        :rtype:
+        Initialize the user interface components.
         """
 
         # Create and set up the label.
         self.__label = QLabel()
-        self.__label.setText("Wellcome to Tax Management System")
+        self.__label.setText("Welcome to Tax Management System")
         self.__label.setStyleSheet("font: bold 16px;")
         label_username = QLabel("Username")
         label_password = QLabel("Password")
@@ -99,15 +106,16 @@ class SignInWindow(QWidget):
         self.__button_clicked = False
 
     def __session_timeout(self):
+        """
+        Handles session timeout.
+        """
         self.__sign_in_time_out_message()
         self.__timer.stop()
         self.close()
 
     def __click_hide_checkbox(self):
         """
-        This function is intended to be called automatically when the user clicks on Hide password checkbox.
-        :return: None
-        :rtype:
+        Hides or displays the password based on the state of the checkbox.
         """
 
         if self.__hide_checkbox.isChecked() is True:
@@ -117,9 +125,11 @@ class SignInWindow(QWidget):
 
     def __click_signin_button(self):
         """
-        This function is intended to be called automatically when the user clicks on Sign In button.
-        :return: None
-        :rtype:
+        Automatically called when the user clicks the "Sign in" button.
+        - Starts a session timer.
+        - Checks if the attempt limit has been reached.
+        - Validates the entered username and password.
+        - Displays success or failure messages accordingly.
         """
 
         self.__timer.start(180000)
@@ -155,16 +165,15 @@ class SignInWindow(QWidget):
 
     def __click_cancel_button(self):
         """
-        This function is intended to be called automatically when the user clicks on Cancel button.
-        :return: None
+        Automatically called when the user clicks the "Cancel" button.
+        - Closes the sign-in window.
         """
 
         self.close()
 
     def __sign_in_success_message(self):
         """
-        This message is intended to be called automatically when the user successfully signs in.
-        :return: None
+        Displays a confirmation message when sign-in is successful.
         """
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Sign in successful")
@@ -173,8 +182,7 @@ class SignInWindow(QWidget):
 
     def __sign_in_failure_message(self):
         """
-        This message is intended to be called automatically when the user unsuccessfully tries to sign in.
-        :return: None
+        Displays a warning message when sign-in fails due to incorrect credentials.
         """
 
         warning_dialog = QMessageBox(self)
@@ -185,9 +193,7 @@ class SignInWindow(QWidget):
 
     def __sign_in_credentials_missing_message(self):
         """
-        This message is intended to be called automatically when the user tries to sign in without entering
-        credentials.
-        :return: None
+        Displays a warning message when no credentials are entered.
         """
 
         warning_dialog = QMessageBox(self)
@@ -198,8 +204,8 @@ class SignInWindow(QWidget):
 
     def __sign_in_attempts_limit_message(self):
         """
-        This message is intended to be called automatically when the user reaches sign in attempts limit.
-        :return: None
+        Displays a warning message when the sign-in attempts limit is reached.
+        - Disables sign-in and cancel buttons, password and username fields, and the hide checkbox.
         """
 
         warning_dialog = QMessageBox(self)
@@ -215,8 +221,8 @@ class SignInWindow(QWidget):
 
     def __sign_in_time_out_message(self):
         """
-        This message is intended to be called automatically when the time for sing in runs out.
-        :return: None
+        Displays a warning message when the sign-in session times out.
+        - Disables sign-in and cancel buttons, password and username fields, and the hide checkbox.
         """
 
         warning_dialog = QMessageBox(self)

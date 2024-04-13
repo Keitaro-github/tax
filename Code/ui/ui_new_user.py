@@ -8,10 +8,25 @@ import json
 
 
 class NewUserWindow(QWidget):
+    """
+    Represents a Window created with PyQt6 for interaction of system user with GUI.
+
+    Attributes:
+        host (str): The hostname or IP address of the server to connect to.
+        port (int): The port used by the server for the connection.
+        __main_layout (QVBoxLayout): A layout widget for organizing GUI components.
+    """
     # Define the user_saved signal
     user_saved = pyqtSignal()
 
     def __init__(self, host, port):
+        """
+        Initializes a new instance of the NewUserWindow class.
+
+        Args:
+           host (str): The server's hostname or IP address to connect to.
+           port (int): The port used by the server to connect to.
+        """
         super().__init__()  # Initialize default constructor of parent class
         self.host = host  # Define the host attribute
         self.port = port  # Define the port attribute
@@ -27,9 +42,12 @@ class NewUserWindow(QWidget):
 
     def __init_ui(self):
         """
-        This function is intended to create all UI components.
-        :return: None
-        :rtype:
+         Creates and sets up all UI components necessary for user input.
+
+        This method initializes various input fields and buttons required for entering and saving user information.
+        Each UI component is created and configured with appropriate settings such as placeholders, validators, and
+        event handlers. Layouts are created to organize these components in a visually appealing manner. Finally, the
+        components are added to the main layout of the window for display.
         """
 
         # Create and set up the label.
@@ -181,6 +199,9 @@ class NewUserWindow(QWidget):
         self.__main_layout.addLayout(button_layout)
 
     def __handle_widget_edit(self):
+        """
+        A slot method that handles the Editing finished signal for various widgets.
+        """
         # Slot method to handle the editingFinished signal for various widgets
         sender = self.sender()
         if isinstance(sender, (QComboBox, QDateEdit, QSpinBox)):
@@ -188,6 +209,9 @@ class NewUserWindow(QWidget):
             self.__set_widget_color(sender, "black")
 
     def __set_widget_color(self, widget, color):
+        """
+        Changes text color to black once editing is finished.
+        """
         # Set the text color of the widget
         widget.setStyleSheet(f"{widget.metaObject().className()} {{ color: {color}; }}")
 
@@ -195,8 +219,39 @@ class NewUserWindow(QWidget):
                                 address_zip_code, address_city, address_street, address_house_number,
                                 phone_country_code, phone_number, marital_status):
         """
-        Check if all the fields are filled.
-        """
+        Checks if all fields are filled: national_id, first_name, last_name, date_of_birth, gender, address_country,
+                                address_zip_code, address_city, address_street, address_house_number,
+                                phone_country_code, phone_number, marital_status.
+
+        :param national_id: The national ID of user.
+        :type national_id: int
+        :param first_name: The first name of user.
+        :type first_name: str
+        :param last_name: The last name  of user.
+        :type last_name: str
+        :param date_of_birth: The date of birth of the user in the format 'dd.MM.yyyy'.
+        :type date_of_birth: str
+        :param gender: The gender of user in the format "male" or "female".
+        :type gender: str
+        :param address_country: The address country of user.
+        :type address_country: str
+        :param address_zip_code: The address zip code of user.
+        :type address_zip_code: int
+        :param address_city: The address city of the user.
+        :type address_city: str
+        :param address_street: The address street of user.
+        :type address_street: str
+        :param address_house_number: The address house number of user.
+        :type address_house_number: int
+        :param phone_country_code: The phone country code of user in the format "+XX" or "+XXX".
+        :type phone_country_code: str
+        :param phone_number: The phone number of the user in the format 'XXXXXXXXX'.
+        :type phone_number: int
+        :param marital_status: The marital status of the user in the format "married" or "unmarried".
+        :type marital_status: str
+        :return: True if all the required fields are filled, False otherwise.
+        :rtype: bool
+               """
         return all([
             national_id,
             first_name,
@@ -215,15 +270,14 @@ class NewUserWindow(QWidget):
 
     def __click_cancel_button(self):
         """
-        This function is intended to be called automatically when the user clicks on Cancel button.
-        :return: None
+        Calls automatically when the user clicks on Cancel button.
         """
 
         self.close()
 
     def __click_ok_button(self):
         """
-        This function is intended to be called automatically when the user clicks on OK button.
+        Calls automatically when the user clicks on OK button.
         """
 
         # Collect data from all widgets
@@ -275,7 +329,42 @@ class NewUserWindow(QWidget):
     def save_new_user_request(self, national_id, first_name, last_name, date_of_birth, gender, address_country,
                               address_zip_code, address_city, address_street, address_house_number,
                               phone_country_code, phone_number, marital_status):
+        """
+        Encodes entered information about the new user into a JSON message and send to the server.
+        Gets response from the server and displays corresponding message.
+
+        :param national_id: The national ID of user.
+        :type national_id: int
+        :param first_name: The first name of user.
+        :type first_name: str
+        :param last_name: The last name  of user.
+        :type last_name: str
+        :param date_of_birth: The date of birth of the user in the format 'dd.MM.yyyy'.
+        :type date_of_birth: str
+        :param gender: The gender of user in the format "male" or "female".
+        :type gender: str
+        :param address_country: The address country of user.
+        :type address_country: str
+        :param address_zip_code: The address zip code of user.
+        :type address_zip_code: int
+        :param address_city: The address city of the user.
+        :type address_city: str
+        :param address_street: The address street of user.
+        :type address_street: str
+        :param address_house_number: The address house number of user.
+        :type address_house_number: int
+        :param phone_country_code: The phone country code of user in the format "+XX" or "+XXX".
+        :type phone_country_code: str
+        :param phone_number: The phone number of the user in the format 'XXXXXXXXX'.
+        :type phone_number: int
+        :param marital_status: The marital status of the user in the format "married" or "unmarried".
+        :type marital_status: str
+        :return: False if the user information failed to save.
+        :rtype: bool
+        """
         try:
+            # Split the country code from the phone number
+            phone_country_code = phone_country_code.split()[1]
             # Create a socket
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
                 # Connect to the server
@@ -327,17 +416,22 @@ class NewUserWindow(QWidget):
                     self.__saved_successfully_message()
                     self.user_saved.emit()
                     print("New user saved successfully")
+                    return True
                 elif response == "User was not saved :-(":
                     self.__unexpected_error_message()
                     print("User was not saved :-(")
+                    return False
                 else:
                     print("Server response error 'here'")
                     return False
-        except Exception as e:
-            print("Error", e)
+        except Exception as exception:
+            print("Error", exception)
             return False
 
     def __enforce_min_length(self):
+        """
+        Sets a minimum number of the digits in the field
+        """
         sender_widget = self.sender()
 
         if sender_widget == self.__address_zip_code_edit:
@@ -355,9 +449,8 @@ class NewUserWindow(QWidget):
 
     def __missing_data_message(self):
         """
-              This message is intended to be called automatically when the user tries to save data with missing entries.
-              :return: None
-              """
+        Displays a warning message when the user tries to save data with missing entries.
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -367,9 +460,8 @@ class NewUserWindow(QWidget):
 
     def __wrong_format_data_message(self):
         """
-              This message is intended to be called automatically when the user tries to enter data in wrong format.
-              :return: None
-              """
+        Displays a warning message in case if data entered in wrong format.
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -379,9 +471,8 @@ class NewUserWindow(QWidget):
 
     def __unexpected_error_message(self):
         """
-              This message is intended to be called automatically in case of unexpected error.
-              :return: None
-              """
+        Displays a warning message in case of an unexpected error.
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -391,9 +482,9 @@ class NewUserWindow(QWidget):
 
     def __saved_successfully_message(self):
         """
-              This message is intended to be called automatically when the user's data is successfully saved.
-              :return: None
-              """
+        Displays a confirmation message if data saved successfully.
+        """
+
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Form complete")
         confirmation_dialog.setText("The data was saved successfully!")

@@ -7,9 +7,27 @@ from PyQt6.QtCore import QDate, pyqtSignal
 
 
 class FindUserWindow(QWidget):
+    """
+    Represents a Window created with PyQt6 for interaction of system user with GUI.
+
+    Attributes:
+        host (str): The hostname or IP address of the server to connect to.
+        port (int): The port used by the server for the connection.
+        main_window (FindUserWindow): An instance of the FindUserWindow class.
+        __main_layout (QVBoxLayout): A layout widget for organizing GUI components.
+    """
     # Define the user_saved signal
     request_complete = pyqtSignal()
+
     def __init__(self, host, port, main_window):
+        """
+        Initializes a new instance of the FindUserWindow class.
+
+        Args:
+           host (str): The server's hostname or IP address to connect to.
+           port (int): The port used by the server to connect to.
+           main_window (FindUserWindow): An instance of the FindUserWindow class.
+        """
         super().__init__()  # Initialize default constructor of parent class
         self.host = host  # Define the host attribute
         self.port = port  # Define the port attribute
@@ -26,9 +44,12 @@ class FindUserWindow(QWidget):
 
     def __init_ui(self):
         """
-        This function is intended to create all UI components.
-        :return: None
-        :rtype:
+         Creates and sets up all UI components necessary for user input.
+
+            This method initializes various input fields and buttons required for entering and saving user information.
+        Each UI component is created and configured with appropriate settings such as placeholders, validators, and
+        event handlers. Layouts are created to organize these components in a visually appealing manner. Finally, the
+        components are added to the main layout of the window for display.
         """
 
         # Create and set up the label.
@@ -119,18 +140,38 @@ class FindUserWindow(QWidget):
         self.__main_layout.addLayout(button_layout)
 
     def __handle_widget_edit(self):
-        # Slot method to handle the editingFinished signal for various widgets
+        """
+        A slot method that handles the Editing finished signal for various widgets.
+        """
+
         sender = self.sender()
         if isinstance(sender, (QComboBox, QDateEdit, QSpinBox)):
             # Change the text color to black once the widget is edited
             self.__set_widget_color(sender, "black")
 
-    def __set_widget_color(self, widget, color):
+    @staticmethod
+    def __set_widget_color(widget, color):
+        """
+        Changes text color to black once editing is finished.
+        """
         widget.setStyleSheet(f"{widget.metaObject().className()} {{ color: {color}; }}")
 
-    def __are_required_fields_filled(self, national_id, first_name, last_name, date_of_birth):
+    @staticmethod
+    def __are_required_fields_filled(national_id, first_name, last_name, date_of_birth):
         """
-        Check if any fields are filled.
+        Checks if any of the 4 fields are filled: national_id, first_name, last_name or date_of_birth.
+
+        :param national_id: The national ID of user.
+        :type national_id: int
+        :param first_name: The first name of user.
+        :type first_name: str
+        :param last_name: The last name  of user.
+        :type last_name: str
+        :param date_of_birth: The date of birth of the user in the format 'dd.MM.yyyy'.
+        :type date_of_birth: str
+        :return: True if any of the required fields are filled or the date_of_birth is not the current date, False
+        otherwise.
+        :rtype: bool
         """
         current_date = QDate.currentDate()
         date_of_birth_qdate = QDate.fromString(date_of_birth, 'dd.MM.yyyy')
@@ -139,15 +180,13 @@ class FindUserWindow(QWidget):
 
     def __click_cancel_button(self):
         """
-        This function is intended to be called automatically when the user clicks on Cancel button.
-        :return: None
+        Calls automatically when the user clicks on Cancel button.
         """
-
         self.close()
 
     def __click_ok_button(self):
         """
-        This function is intended to be called automatically when the user clicks on OK button.
+        Calls automatically when the user clicks on OK button.
         """
         # Collect data from all widgets
         national_id = self.__national_id_edit.text()
@@ -164,6 +203,22 @@ class FindUserWindow(QWidget):
             self.__send_search_request(national_id, first_name, last_name, date_of_birth)
 
     def __send_search_request(self, national_id, first_name, last_name, date_of_birth):
+        """
+        Sends search request to the server containing one or the combination of the following parameters: national_id,
+        first_name, last_name or date_of_birth. Handles the server's response to determine if the search was successful
+        or unsuccessful.
+
+        :param national_id: The national ID of user.
+        :type national_id: int
+        :param first_name: The first name of user.
+        :type first_name: str
+        :param last_name: The last name  of user.
+        :type last_name: str
+        :param date_of_birth: The date of birth of the user in the format 'dd.MM.yyyy'.
+        :type date_of_birth: str
+        :return: True if the server responds with "search_successful", False otherwise.
+        :rtype: bool
+        """
         try:
             # Create a socket
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
@@ -227,6 +282,15 @@ class FindUserWindow(QWidget):
             return False
 
     def __populate_search_results(self, results):
+        """
+        Populates the search results combo box with user information provided by the server or displays "No matching
+        results" placeholder text if no results are found.
+
+        :param results: A list of dictionaries containing user information (national_id, first_name, last_name, date_of_birth).
+        :type results: list of dict
+        :return: None
+        :rtype: None
+        """
         self.__search_results_edit.clear()
         self.__search_results_edit.setStyleSheet("color: black;")
         if not results:
@@ -239,6 +303,14 @@ class FindUserWindow(QWidget):
                 self.__search_results_edit.addItem(display_text)
 
     def __handle_search_result_selected(self, index):
+        """
+        A slot method that handles selection of a user from the search results combo box.
+
+        :param index: The index of the selected item in the search results combo box.
+        :type index: int
+        :return: None
+        :rtype: None
+        """
         if index >= 0:
             # Get the selected item text
             selected_text = self.__search_results_edit.itemText(index)
@@ -253,6 +325,13 @@ class FindUserWindow(QWidget):
             self.__request_user_details(national_id)
 
     def __request_user_details(self, national_id):
+        """
+        Sends a request to the server to retrieve detailed information about a user identified by the provided national
+        ID. Handles the server's response and emits signals to communicate the result.
+
+        :param national_id: The national ID of the user as an integer value.
+        :type national_id: int
+        """
         try:
             # Create a socket
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
@@ -347,7 +426,8 @@ class FindUserWindow(QWidget):
 
     def __get_selected_user_info(self):
         """
-        Retrieve and display information of the selected user.
+        Retrieves national ID from the selected text in the combo box and sends it to the server to request detailed
+        information about the selected user.
         """
         # Get the selected text from the combo box
         selected_text = self.__search_results_edit.currentText()
@@ -360,9 +440,8 @@ class FindUserWindow(QWidget):
 
     def __missing_data_message(self):
         """
-              This message is intended to be called automatically when the user tries to save data with missing entries.
-              :return: None
-              """
+        Displays a warning message when the user tries to save data with missing entries.
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -372,9 +451,8 @@ class FindUserWindow(QWidget):
 
     def __unexpected_error_message(self):
         """
-              This message is intended to be called automatically in case of unexpected error.
-              :return: None
-              """
+        Displays a warning message in case of an unexpected error.
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -384,9 +462,8 @@ class FindUserWindow(QWidget):
 
     def __search_unsuccessful_message(self):
         """
-              This message is intended to be called automatically in case of unsuccessful search.
-              :return: None
-              """
+        Displays a warning message in case of an unsuccessful search.
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -396,9 +473,8 @@ class FindUserWindow(QWidget):
 
     def __search_successful_message(self):
         """
-              This message is intended to be called automatically in case of successful search.
-              :return: None
-              """
+        Displays a confirmation message in case of a successful search.
+        """
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Search successful")
         confirmation_dialog.setText("Here is a result of the search!")
@@ -406,9 +482,8 @@ class FindUserWindow(QWidget):
 
     def __retrieving_successful_message(self):
         """
-              This message is intended to be called automatically in case of successful retrieving.
-              :return: None
-              """
+        Displays a confirmation message in case of successful data retrieval.
+        """
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Retrieving successful")
         confirmation_dialog.setText("Here is a result of the retrieving!")
@@ -416,9 +491,8 @@ class FindUserWindow(QWidget):
 
     def __retrieving_unsuccessful_message(self):
         """
-              This message is intended to be called automatically in case of unsuccessful retrieving.
-              :return: None
-              """
+        Displays a warning message in case of unsuccessful data retrieval.
+        """
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)

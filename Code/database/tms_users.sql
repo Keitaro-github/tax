@@ -1,5 +1,5 @@
 CREATE TABLE tms_users (
- first_name TEXT,
+ username TEXT PRIMARY KEY,
  password TEXT
 );
 INSERT INTO tms_users VALUES
