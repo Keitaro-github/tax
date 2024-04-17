@@ -1,10 +1,22 @@
 import sys
 import ui.ui_signin_window
 from PyQt6.QtWidgets import QApplication
+import json
 
 if __name__ == "__main__":
-    host = "127.0.0.1"
-    port = 65432
+    try:
+        with open("configs/tcp_config.json", 'r') as tcp_config_file:
+            tcp_configs = json.loads(tcp_config_file.read())
+    except OSError:
+        print("Could not get TCP configs. Please, check Code/configs/tcp_config.json file")
+        sys.exit(1)
+
+    try:
+        host = tcp_configs["host"]
+        port = tcp_configs["port"]
+    except KeyError as exception:
+        print(exception)
+        sys.exit(1)
 
     tms_client_app = QApplication(sys.argv)
     sign_in_window = ui.ui_signin_window.SignInWindow(host, port)
