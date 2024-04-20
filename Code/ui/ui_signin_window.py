@@ -2,10 +2,37 @@ import sys
 import os
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QCheckBox, QVBoxLayout, QHBoxLayout,
                              QMessageBox)
+from PyQt6.QtCore import pyqtSignal, QObject
+# from PyQt6 import QtCore
 import Code.signin_services as signin_services
 import bcrypt
 from PyQt6.QtCore import QTimer
+import threading
 
+
+class Communicate(QObject):
+    signal = pyqtSignal()
+
+
+def sign_in_thread(*args):
+    try:
+        host = args[0]
+        port = args[1]
+        username = args[2]
+        password = args[3]
+        signal = args[4]
+
+        sign_in_services = signin_services.Client(host, port, username, password)
+        result = sign_in_services.send_request()
+
+        if result is True:
+            SignInWindow.request_status = True
+        else:
+            SignInWindow.request_status = False
+
+        signal.emit()
+    except IndexError:
+        pass
 
 class SignInWindow(QWidget):
     """
@@ -17,6 +44,10 @@ class SignInWindow(QWidget):
         port (int): The port used by the server for the connection.
         __main_layout (QVBoxLayout): A layout widget for organizing GUI components.
     """
+
+    request_complete = Communicate()
+    request_status = False
+
     def __init__(self, host, port):
         super().__init__()  # Initialize default constructor of parent class
         self.host = host  # Define the host attribute
@@ -144,24 +175,31 @@ class SignInWindow(QWidget):
 
         self.__button_clicked = True
 
-        sign_in_services = signin_services.Client(self.host, self.port, username, password)
-        result = sign_in_services.send_request()
+        self.__class__.request_complete.signal.connect(lambda: self.__sign_in_done(username, password))
 
-        if result is True:
+        thread = threading.Thread(target=sign_in_thread,
+                                  args=(self.host, self.port, username, password, self.__class__.request_complete.signal))
+        thread.start()
+
+    def __sign_in_done(self, username, password):
+
+        if self.__class__.request_status is True:
             self.__sign_in_success_message()
             self.close()
 
-            filename = os.getcwd() + '/' + "ui/ui_tms_main_window.py"
+            filename = os.getcwd() + '/' + "Code/ui/ui_tms_main_window.py"
             command = f"python {filename} {username} {password}"
             os.system(command)
 
-        elif result is False:
+        elif self.__class__.request_status is False:
             self.__attempt_count += 1
             self.__sign_in_failure_message()
 
             # Reset the username and password fields
             self.__username_edit.clear()
             self.__password_edit.clear()
+
+        self.__class__.request_complete = False
 
     def __click_cancel_button(self):
         """

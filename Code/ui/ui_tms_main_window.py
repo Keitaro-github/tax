@@ -2,8 +2,10 @@ import sys
 from PyQt6.QtWidgets import (QWidget, QApplication, QLabel, QHBoxLayout,
                              QTabWidget, QSplitter, QFormLayout, QMenuBar)
 from PyQt6.QtGui import (QAction)
-from Code.ui.ui_new_user import NewUserWindow
-from Code.ui.ui_find_user import FindUserWindow
+# from Code.ui.ui_new_user import NewUserWindow
+# from Code.ui.ui_find_user import FindUserWindow
+from ui_new_user import NewUserWindow
+from ui_find_user import FindUserWindow
 from PyQt6.QtCore import pyqtSignal
 
 
