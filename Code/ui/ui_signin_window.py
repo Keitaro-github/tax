@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLab
 from PyQt6.QtCore import pyqtSignal, QObject
 import Code
 import Code.signin_services as signin_services
+import Code.ui.ui_tms_main_window as ui_tms_main_window
 from Code.utils import tms_logs
 import bcrypt
 from PyQt6.QtCore import QTimer
@@ -16,7 +17,32 @@ class Communicate(QObject):
     signal = pyqtSignal()
 
 
-def sign_in_thread(*args):
+def thread_run_signin_window(*args):
+    """
+    This function implements the auxiliary thread intended to launch Sign In window.
+    Args:
+        *args: tuple of input parameters.
+
+    Returns: None
+    """
+
+    try:
+        tms_logger = args[0]
+        host = args[1]
+        port = args[2]
+
+        tms_logger.log_debug("Sign in window thread has been launched")
+
+        application = QApplication(sys.argv)
+        signin_window = SignInWindow(tms_logger, host, port)
+        signin_window.show()
+        application.exec()
+
+    except IndexError:
+        pass
+
+
+def thread_sign_in_request(*args):
     """
     This function implements the auxiliary thread intended to send TCP sign in request and wait TCP response.
     Args:
@@ -46,6 +72,33 @@ def sign_in_thread(*args):
             SignInWindow.request_status = False
 
         signal.emit()
+    except IndexError:
+        pass
+
+
+def thread_run_main_tms_window(*args):
+    """
+    This function implements the auxiliary thread intended to launch TMS main window.
+    Args:
+        *args: tuple of input parameters.
+
+    Returns: None
+    """
+
+    try:
+        tms_logger = args[0]
+        host = args[1]
+        port = args[2]
+        username = args[3]
+        password = args[4]
+
+        tms_logger.log_debug("Main TMS window thread has been launched")
+
+        app = QApplication(sys.argv)
+        main_window = ui_tms_main_window.TMSMainWindow(tms_logger, username, password, host, port)
+        main_window.show()
+        sys.exit(app.exec())
+
     except IndexError:
         pass
 
@@ -202,15 +255,17 @@ class SignInWindow(QWidget):
 
         self.__class__.request_complete.signal.connect(lambda: self.__sign_in_done(username, password))
 
-        thread = threading.Thread(target=sign_in_thread,
-                                  name="SIGN_IN_THREAD",
-                                  args=(self.__tms_logger,
-                                        self.host,
-                                        self.port,
-                                        username,
-                                        password,
-                                        self.__class__.request_complete.signal))
-        thread.start()
+        # Create separate thread THREAD_SIGNIN_REQUEST intended to send TCP sign in request.
+        signin_request_thread = threading.Thread(target=thread_sign_in_request,
+                                                 name="THREAD_SIGNIN_REQUEST",
+                                                 args=(self.__tms_logger,
+                                                       self.host,
+                                                       self.port,
+                                                       username,
+                                                       password,
+                                                       self.__class__.request_complete.signal))
+        # Launch separate thread THREAD_SIGNIN_REQUEST.
+        signin_request_thread.start()
 
     def __sign_in_done(self, username, password):
         """
@@ -228,12 +283,8 @@ class SignInWindow(QWidget):
 
             self.__tms_logger.log_debug("Sign in procedure has been completed successfully")
             self.__sign_in_success_message()
+            self.__timer.stop()
             self.close()
-
-            filename = os.getcwd() + '/' + "Code/ui/ui_tms_main_window.py"
-            command = f"python {filename} {username} {password}"
-            os.system(command)
-            self.__tms_logger.log_debug("ui_tms_main_window.py module ha been launched")
 
         elif self.__class__.request_status is False:
             self.__tms_logger.log_debug("Sign in procedure has been completed unsuccessfully")
@@ -334,11 +385,12 @@ class SignInWindow(QWidget):
 
 if __name__ == "__main__":
 
+    # Create and setup TMS logger.
     tms_logger = tms_logs.TMSLogger()
     status = tms_logger.setup()
     if status is False:
         sys.exit(1)
-
+    # Get TCP configurations from external JSON file.
     try:
         with open(Code.TCP_CONFIGS, 'r') as tcp_config_file:
             tcp_configs = json.loads(tcp_config_file.read())
@@ -347,7 +399,7 @@ if __name__ == "__main__":
         sys.exit(1)
     else:
         tms_logger.log_debug("TCP configs have been read successfully")
-
+    # Parse TCP configurations represented in JSON format.
     try:
         host = tcp_configs["host"]
         port = tcp_configs["port"]
@@ -357,7 +409,18 @@ if __name__ == "__main__":
     else:
         tms_logger.log_debug("TCP configs have been parsed successfully")
 
-    application = QApplication(sys.argv)
-    signin_window = SignInWindow(tms_logger, host, port)
-    signin_window.show()
-    application.exec()
+    # Create separate thread to run Sign In window independently on Main thread.
+    run_sign_in_thread = threading.Thread(name="THREAD_RUN_SIGNIN_WINDOW",
+                                          target=thread_run_signin_window,
+                                          args=(tms_logger, host, port))
+    # Launch separate thread THREAD_RUN_SIGNIN_WINDOW.
+    run_sign_in_thread.start()
+    # Suspend Main thread at this point until THREAD_RUN_SIGNIN_WINDOW is terminated.
+    run_sign_in_thread.join()
+
+    # Create separate thread to run Main TMS window independently on Main thread.
+    run_main_tms_window_thread = threading.Thread(name="THREAD_RUN_MAIN_TMS_WINDOW",
+                                                  target=thread_run_main_tms_window,
+                                                  args=(tms_logger, host, port, None, None,))
+    # Launch separate thread THREAD_RUN_MAIN_TMS_WINDOW.
+    run_main_tms_window_thread.start()

@@ -2,8 +2,7 @@ import sys
 from PyQt6.QtWidgets import (QWidget, QApplication, QLabel, QHBoxLayout,
                              QTabWidget, QSplitter, QFormLayout, QMenuBar)
 from PyQt6.QtGui import (QAction)
-# from Code.ui.ui_new_user import NewUserWindow
-# from Code.ui.ui_find_user import FindUserWindow
+from Code.utils.tms_logs import TMSLogger
 from ui_new_user import NewUserWindow
 from ui_find_user import FindUserWindow
 from PyQt6.QtCore import pyqtSignal
@@ -16,7 +15,7 @@ class TMSMainWindow(QWidget):
 
     Attributes:
         username (str): The username of the TMS user.
-        password (int): The password of the TMS user.
+        password (str): The password of the TMS user.
         host (str): The hostname or IP address of the server to connect to.
         port (int): The port used by the server for the connection.
         main_layout (QVBoxLayout): A layout widget for organizing GUI components.
@@ -24,17 +23,21 @@ class TMSMainWindow(QWidget):
     """
 
     user_details_retrieved_signal = pyqtSignal(dict)
-    def __init__(self, username, password, host, port):
+
+    def __init__(self, tms_logger: TMSLogger, username: str, password: str, host: str, port: int):
         """
         Initializes a new instance of the TMSMainWindow class.
 
         Args:
+            tms_logger (TMSLogger): TMS Logger instance.
             username (str): The username of the TMS user.
-            password (int): The password of the TMS user.
+            password (str): The password of the TMS user.
             host (str): The server's hostname or IP address to connect to.
             port (int): The port used by the server to connect to.
         """
         super().__init__()
+
+        self.__tms_logger = tms_logger
 
         self.__username = username
         self.__password = password
@@ -166,6 +169,8 @@ class TMSMainWindow(QWidget):
 
         self.__new_user_window = None
         self.__find_user_window = None
+
+        self.__tms_logger.log_debug("Main TMS window has been launched")
 
     def __show_new_user_window(self):
         """
