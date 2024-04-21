@@ -1,10 +1,12 @@
 import sys
 import os
+import json
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QCheckBox, QVBoxLayout, QHBoxLayout,
                              QMessageBox)
 from PyQt6.QtCore import pyqtSignal, QObject
-# from PyQt6 import QtCore
+import Code
 import Code.signin_services as signin_services
+from Code.utils import tms_logs
 import bcrypt
 from PyQt6.QtCore import QTimer
 import threading
@@ -15,15 +17,28 @@ class Communicate(QObject):
 
 
 def sign_in_thread(*args):
-    try:
-        host = args[0]
-        port = args[1]
-        username = args[2]
-        password = args[3]
-        signal = args[4]
+    """
+    This function implements the auxiliary thread intended to send TCP sign in request and wait TCP response.
+    Args:
+        *args: tuple of input parameters.
 
-        sign_in_services = signin_services.Client(host, port, username, password)
-        result = sign_in_services.send_request()
+    Returns: None
+    """
+
+    try:
+        tms_logger = args[0]
+        host = args[1]
+        port = args[2]
+        username = args[3]
+        password = args[4]
+        signal = args[5]
+
+        tms_logger.log_debug("Sign in thread has been launched")
+
+        tcp_client = signin_services.Client(host, port, username, password)
+        result = tcp_client.send_request()
+
+        tms_logger.log_debug(f"TMS server response is {result}")
 
         if result is True:
             SignInWindow.request_status = True
@@ -33,6 +48,7 @@ def sign_in_thread(*args):
         signal.emit()
     except IndexError:
         pass
+
 
 class SignInWindow(QWidget):
     """
@@ -48,8 +64,9 @@ class SignInWindow(QWidget):
     request_complete = Communicate()
     request_status = False
 
-    def __init__(self, host, port):
+    def __init__(self, tms_logger, host, port):
         super().__init__()  # Initialize default constructor of parent class
+        self.__tms_logger = tms_logger
         self.host = host  # Define the host attribute
         self.port = port  # Define the port attribute
 
@@ -136,10 +153,14 @@ class SignInWindow(QWidget):
 
         self.__button_clicked = False
 
+        self.__tms_logger.log_debug("SignInWindow has been initialized successfully")
+
     def __session_timeout(self):
         """
         Handles session timeout.
         """
+
+        self.__tms_logger.log_debug("Sign in session timeout occurred")
         self.__sign_in_time_out_message()
         self.__timer.stop()
         self.close()
@@ -150,8 +171,10 @@ class SignInWindow(QWidget):
         """
 
         if self.__hide_checkbox.isChecked() is True:
+            self.__tms_logger.log_debug("Hide checkbox has been checked")
             self.__password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         else:
+            self.__tms_logger.log_debug("Hide checkbox has been unchecked")
             self.__password_edit.setEchoMode(QLineEdit.EchoMode.Normal)
 
     def __click_signin_button(self):
@@ -162,6 +185,8 @@ class SignInWindow(QWidget):
         - Validates the entered username and password.
         - Displays success or failure messages accordingly.
         """
+
+        self.__tms_logger.log_debug("Sign in button has been clicked")
 
         self.__timer.start(180000)
 
@@ -178,20 +203,40 @@ class SignInWindow(QWidget):
         self.__class__.request_complete.signal.connect(lambda: self.__sign_in_done(username, password))
 
         thread = threading.Thread(target=sign_in_thread,
-                                  args=(self.host, self.port, username, password, self.__class__.request_complete.signal))
+                                  name="SIGN_IN_THREAD",
+                                  args=(self.__tms_logger,
+                                        self.host,
+                                        self.port,
+                                        username,
+                                        password,
+                                        self.__class__.request_complete.signal))
         thread.start()
 
     def __sign_in_done(self, username, password):
+        """
+        This method is intended to be called automatically when the signal has been emitted by SIGN_IN_THREAD.
+        This method launches ui_tms_main_window module if sign in is successful.
+        Args:
+            username: username entered by the user
+            password: password entered by the user
+
+        Returns: None
+
+        """
 
         if self.__class__.request_status is True:
+
+            self.__tms_logger.log_debug("Sign in procedure has been completed successfully")
             self.__sign_in_success_message()
             self.close()
 
             filename = os.getcwd() + '/' + "Code/ui/ui_tms_main_window.py"
             command = f"python {filename} {username} {password}"
             os.system(command)
+            self.__tms_logger.log_debug("ui_tms_main_window.py module ha been launched")
 
         elif self.__class__.request_status is False:
+            self.__tms_logger.log_debug("Sign in procedure has been completed unsuccessfully")
             self.__attempt_count += 1
             self.__sign_in_failure_message()
 
@@ -207,12 +252,16 @@ class SignInWindow(QWidget):
         - Closes the sign-in window.
         """
 
+        self.__tms_logger.log_debug("Cancel button has been clicked. Close application.")
         self.close()
 
     def __sign_in_success_message(self):
         """
         Displays a confirmation message when sign-in is successful.
         """
+
+        self.__tms_logger.log_debug(f"Pop up: sign-in is successful")
+
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Sign in successful")
         confirmation_dialog.setText("You have successfully signed in!")
@@ -222,6 +271,8 @@ class SignInWindow(QWidget):
         """
         Displays a warning message when sign-in fails due to incorrect credentials.
         """
+
+        self.__tms_logger.log_info(f"Pop up: incorrect credentials")
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -234,6 +285,8 @@ class SignInWindow(QWidget):
         Displays a warning message when no credentials are entered.
         """
 
+        self.__tms_logger.log_info(f"Pop up: no credentials are entered")
+
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
         warning_dialog.setWindowTitle("Missing credentials")
@@ -245,6 +298,8 @@ class SignInWindow(QWidget):
         Displays a warning message when the sign-in attempts limit is reached.
         - Disables sign-in and cancel buttons, password and username fields, and the hide checkbox.
         """
+
+        self.__tms_logger.log_info(f"Pop up: attempts limit is reached")
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)
@@ -263,6 +318,8 @@ class SignInWindow(QWidget):
         - Disables sign-in and cancel buttons, password and username fields, and the hide checkbox.
         """
 
+        self.__tms_logger.log_info(f"Pop up: sign-in session times out")
+
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)
         warning_dialog.setWindowTitle("Sign in time out!")
@@ -276,9 +333,31 @@ class SignInWindow(QWidget):
 
 
 if __name__ == "__main__":
+
+    tms_logger = tms_logs.TMSLogger()
+    status = tms_logger.setup()
+    if status is False:
+        sys.exit(1)
+
+    try:
+        with open(Code.TCP_CONFIGS, 'r') as tcp_config_file:
+            tcp_configs = json.loads(tcp_config_file.read())
+    except OSError:
+        tms_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
+        sys.exit(1)
+    else:
+        tms_logger.log_debug("TCP configs have been read successfully")
+
+    try:
+        host = tcp_configs["host"]
+        port = tcp_configs["port"]
+    except KeyError as exception:
+        tms_logger.log_critical(exception)
+        sys.exit(1)
+    else:
+        tms_logger.log_debug("TCP configs have been parsed successfully")
+
     application = QApplication(sys.argv)
-    host = "127.0.0.1"
-    port = 65432
-    signin_window = SignInWindow(host, port)
+    signin_window = SignInWindow(tms_logger, host, port)
     signin_window.show()
     application.exec()
