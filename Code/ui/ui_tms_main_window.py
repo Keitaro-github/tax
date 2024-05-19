@@ -3,9 +3,11 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QLabel, QHBoxLayout,
                              QTabWidget, QSplitter, QFormLayout, QMenuBar)
 from PyQt6.QtGui import (QAction)
 from Code.utils.tms_logs import TMSLogger
-from ui_new_user import NewUserWindow
-from ui_find_user import FindUserWindow
+from Code.ui.ui_new_user import NewUserWindow
+from Code.ui.ui_find_user import FindUserWindow
 from PyQt6.QtCore import pyqtSignal
+import Code
+import json
 
 
 class TMSMainWindow(QWidget):
@@ -230,6 +232,30 @@ class TMSMainWindow(QWidget):
 
 
 if __name__ == "__main__":
+
+    tms_logger = TMSLogger()
+    status = tms_logger.setup()
+    if status is False:
+        sys.exit(1)
+    # Get TCP configurations from external JSON file.
+    try:
+        with open(Code.TCP_CONFIGS, 'r') as tcp_config_file:
+            tcp_configs = json.loads(tcp_config_file.read())
+    except OSError:
+        tms_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
+        sys.exit(1)
+    else:
+        tms_logger.log_debug("TCP configs have been read successfully")
+    # Parse TCP configurations represented in JSON format.
+    try:
+        host = tcp_configs["host"]
+        port = tcp_configs["port"]
+    except KeyError as exception:
+        tms_logger.log_critical(exception)
+        sys.exit(1)
+    else:
+        tms_logger.log_debug("TCP configs have been parsed successfully")
+
     app = QApplication(sys.argv)
     host = "127.0.0.1"
     port = 65432
@@ -237,10 +263,10 @@ if __name__ == "__main__":
     try:
         username = sys.argv[1]
         password = sys.argv[2]
-        main_window = TMSMainWindow(username, password, host, port)
+        main_window = TMSMainWindow(tms_logger, username, password, host, port)
 
     except IndexError:
-        main_window = TMSMainWindow(None, None, host, port)
+        main_window = TMSMainWindow(tms_logger, None, None, host, port)
 
     main_window.show()
     sys.exit(app.exec())

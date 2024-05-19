@@ -15,6 +15,7 @@ import threading
 
 class Communicate(QObject):
     signal = pyqtSignal()
+    is_set = False
 
 
 def thread_run_signin_window(*args):
@@ -61,7 +62,7 @@ def thread_sign_in_request(*args):
 
         tms_logger.log_debug("Sign in thread has been launched")
 
-        tcp_client = signin_services.Client(host, port, username, password)
+        tcp_client = signin_services.TCPClient(host, port, username, password)
         result = tcp_client.send_request()
 
         tms_logger.log_debug(f"TMS server response is {result}")
@@ -76,9 +77,9 @@ def thread_sign_in_request(*args):
         pass
 
 
-def thread_run_main_tms_window(*args):
+def run_main_tms_window(*args):
     """
-    This function implements the auxiliary thread intended to launch TMS main window.
+    This function is intended to launch TMS main window.
     Args:
         *args: tuple of input parameters.
 
@@ -132,7 +133,7 @@ class SignInWindow(QWidget):
         # Call PyQt6 API to set prepared layout with all UI components.
         self.setLayout(self.__main_layout)
         # Sign in attempts limit and count.
-        self.__attempt_limit = 3
+        self.__ATTEMPTS_LIMIT = 5
         self.__attempt_count = 0
 
     def __init_ui(self):
@@ -244,8 +245,9 @@ class SignInWindow(QWidget):
         self.__timer.start(180000)
 
         # Attempts limit check
-        if self.__attempt_count >= self.__attempt_limit:
+        if self.__attempt_count >= self.__ATTEMPTS_LIMIT:
             self.__sign_in_attempts_limit_message()
+            self.close()
             return
 
         username = self.__username_edit.text()
@@ -253,7 +255,9 @@ class SignInWindow(QWidget):
 
         self.__button_clicked = True
 
-        self.__class__.request_complete.signal.connect(lambda: self.__sign_in_done(username, password))
+        if self.__class__.request_complete.is_set is False:
+            self.__class__.request_complete.signal.connect(lambda: self.__sign_in_done(username, password))
+            self.__class__.request_complete.is_set = True
 
         # Create separate thread THREAD_SIGNIN_REQUEST intended to send TCP sign in request.
         signin_request_thread = threading.Thread(target=thread_sign_in_request,
@@ -295,7 +299,7 @@ class SignInWindow(QWidget):
             self.__username_edit.clear()
             self.__password_edit.clear()
 
-        self.__class__.request_complete = False
+        self.__class__.request_status = False
 
     def __click_cancel_button(self):
         """
@@ -418,9 +422,6 @@ if __name__ == "__main__":
     # Suspend Main thread at this point until THREAD_RUN_SIGNIN_WINDOW is terminated.
     run_sign_in_thread.join()
 
-    # Create separate thread to run Main TMS window independently on Main thread.
-    run_main_tms_window_thread = threading.Thread(name="THREAD_RUN_MAIN_TMS_WINDOW",
-                                                  target=thread_run_main_tms_window,
-                                                  args=(tms_logger, host, port, None, None,))
-    # Launch separate thread THREAD_RUN_MAIN_TMS_WINDOW.
-    run_main_tms_window_thread.start()
+    # TODO: Check when Main TMS window must be launched has to be added
+    if True:
+        run_main_tms_window(tms_logger, host, port, None, None,)

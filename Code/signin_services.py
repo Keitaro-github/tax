@@ -84,7 +84,7 @@ def validate_password(password):
         return True
 
 
-class Client:
+class TCPClient:
     def __init__(self, host, port, username=None, password=None):
         self.host = host  # The server's hostname or IP address
         self.port = port  # The port used by the server
