@@ -26,7 +26,7 @@ class FindUserWindow(QWidget):
         Args:
            host (str): The server's hostname or IP address to connect to.
            port (int): The port used by the server to connect to.
-           main_window (FindUserWindow): An instance of the FindUserWindow class.
+           main_window (TMSMainWindow): An instance of the TMSMainWindow class.
         """
         super().__init__()  # Initialize default constructor of parent class
         self.host = host  # Define the host attribute
@@ -188,6 +188,9 @@ class FindUserWindow(QWidget):
         """
         Calls automatically when the user clicks on OK button.
         """
+        # Delete previous search result if available
+        self.__search_results_edit.clear()
+        self.__search_results_edit.setStyleSheet("color: gray;")
         # Collect data from all widgets
         national_id = self.__national_id_edit.text()
         first_name = self.__first_name_edit.text()
@@ -257,8 +260,6 @@ class FindUserWindow(QWidget):
                 client_socket.sendall(message_json_with_delimiter)
 
                 response = client_socket.recv(1024).decode()
-                print("Response message received from server:", response)
-
                 response_json = json.loads(response)
 
                 if response_json["command"] == "search_successful":
