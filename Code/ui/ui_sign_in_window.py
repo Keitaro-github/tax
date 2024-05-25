@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLab
                              QMessageBox)
 from PyQt6.QtCore import pyqtSignal, QObject
 import Code
+import Code.tcp_ip.tcp_driver as tcp_driver
 import Code.sign_in_services as sign_in_services
 import Code.ui.ui_tms_main_window as ui_tms_main_window
 from Code.utils import tms_logs
@@ -37,7 +38,7 @@ def thread_run_sign_in_window(*args):
         sign_in_window.show()
         sys.exit(application.exec())
 
-    except IndexError:
+    except Exception as error:
         pass
 
 
@@ -59,20 +60,58 @@ def thread_sign_in_request(*args):
 
         tms_logger.log_debug("Sign in thread has been launched")
 
-        tcp_client = sign_in_services.TCPClient(host, port, username, password)
-        result = tcp_client.send_request()
+        header_data = {
+            "Content-Type": "application/json",
+            "Encoding": "utf-8"
+        }
 
-        tms_logger.log_debug(f"TMS server response is {result}")
+        request_data = {
+            "command": "login_request",
+            "username": username,
+            "password": password
+        }
 
-        if result is True:
-            SignInWindow.request_status = True
-        else:
+        # Combine header and request data into a single dictionary
+        message = {
+            "header": header_data,
+            "request": request_data
+        }
+
+        # Serialize the combined dictionary into JSON format
+        message_json = json.dumps(message)
+
+        # Define a delimiter to mark the end of the message
+        delimiter = b'\r\n'
+
+        # Append the delimiter to the serialized message
+        request = message_json.encode() + delimiter
+
+        tcp_client = tcp_driver.TCPClient(tms_logger, host, port)
+
+        response = tcp_client.send_request(request)
+
+        tms_logger.log_debug(f"TMS server response is {response}")
+
+        try:
+            if response["error"] != 0:
+                SignInWindow.request_status = False
+            else:
+                if response["response"] == "User logged in successfully":
+                    SignInWindow.request_status = True
+                elif response["response"] == "Username and password must be provided":
+                    SignInWindow.request_status = False
+                elif response["response"] == "Invalid username or password":
+                    SignInWindow.request_status = False
+                else:
+                    print("Server response error")
+                    SignInWindow.request_status = False
+        except KeyError:
             SignInWindow.request_status = False
+            tms_logger.log_debug(f"Could not parse the response")
 
-        tms_logger.log_debug(f"Emitting signal with result: {result}")
         signal.emit()
-    except IndexError:
-        pass
+    except Exception as error:
+        print(error)
 
 
 def run_main_tms_window(*args):
@@ -97,8 +136,8 @@ def run_main_tms_window(*args):
         main_window.show()
         sys.exit(app.exec())
 
-    except IndexError:
-        pass
+    except Exception as error:
+        print(f"Could not run Main TMS window. Error: {error}")
 
 
 class SignInWindow(QWidget):
