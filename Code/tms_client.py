@@ -1,10 +1,38 @@
 import sys
 import Code
-from Code.ui import ui_signin_window
+import threading
+from Code.ui import ui_sign_in_window
+from Code.ui import ui_tms_main_window
 from Code.utils import tms_logs
 from PyQt6.QtWidgets import QApplication
 import json
-import threading
+
+
+def thread_run_main_tms_window(*args):
+    """
+    This function implements the auxiliary thread intended to launch TMS main window.
+    Args:
+        *args: tuple of input parameters.
+
+    Returns: None
+    """
+
+    try:
+        tms_logger = args[0]
+        host = args[1]
+        port = args[2]
+        username = args[3]
+        password = args[4]
+
+        tms_logger.log_debug("Main TMS window thread has been launched")
+
+        app = QApplication(sys.argv)
+        main_window = ui_tms_main_window.TMSMainWindow(tms_logger, username, password, host, port)
+        main_window.show()
+        sys.exit(app.exec())
+
+    except Exception as e:
+        tms_logger.log_critical(f"Error occurred while launching main TMS window: {e}")
 
 
 if __name__ == "__main__":
@@ -32,20 +60,13 @@ if __name__ == "__main__":
     else:
         tms_logger.log_debug("TCP configs have been parsed successfully")
 
-    # tms_client_app = QApplication(sys.argv)
-    # sign_in_window = ui_signin_window.SignInWindow(tms_logger, host, port)
-    # sign_in_window.show()
-    # sys.exit(tms_client_app.exec())
-
-    # Create separate thread to run Sign In window independently on Main thread.
-    run_sign_in_thread = threading.Thread(name="THREAD_RUN_SIGNIN_WINDOW",
-                                          target=ui_signin_window.thread_run_signin_window,
+    run_sign_in_thread = threading.Thread(name="THREAD_RUN_SIGN_IN_WINDOW",
+                                          target=ui_sign_in_window.thread_run_sign_in_window,
                                           args=(tms_logger, host, port))
-    # Launch separate thread THREAD_RUN_SIGNIN_WINDOW.
+    # Launch separate thread THREAD_RUN_SIGN_IN_WINDOW.
     run_sign_in_thread.start()
-    # Suspend Main thread at this point until THREAD_RUN_SIGNIN_WINDOW is terminated.
+    # Suspend Main thread at this point until THREAD_RUN_SIGN_IN_WINDOW is terminated.
     run_sign_in_thread.join()
 
-    # TODO: Check when Main TMS window must be launched has to be added
-    if True:
-        ui_signin_window.thread_run_main_tms_window(tms_logger, host, port, None, None, )
+    if ui_sign_in_window.SignInWindow.request_status:
+        ui_sign_in_window.run_main_tms_window(tms_logger, host, port, None, None, )

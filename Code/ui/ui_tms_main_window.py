@@ -1,13 +1,14 @@
 import sys
+import Code
+import json
 from PyQt6.QtWidgets import (QWidget, QApplication, QLabel, QHBoxLayout,
                              QTabWidget, QSplitter, QFormLayout, QMenuBar)
 from PyQt6.QtGui import (QAction)
 from Code.utils.tms_logs import TMSLogger
+from Code.utils import tms_logs
 from Code.ui.ui_new_user import NewUserWindow
 from Code.ui.ui_find_user import FindUserWindow
 from PyQt6.QtCore import pyqtSignal
-import Code
-import json
 
 
 class TMSMainWindow(QWidget):
@@ -40,7 +41,6 @@ class TMSMainWindow(QWidget):
         super().__init__()
 
         self.__tms_logger = tms_logger
-
         self.__username = username
         self.__password = password
         self.host = host
@@ -232,8 +232,8 @@ class TMSMainWindow(QWidget):
 
 
 if __name__ == "__main__":
-
-    tms_logger = TMSLogger()
+    # Create and setup TMS logger.
+    tms_logger = tms_logs.TMSLogger()
     status = tms_logger.setup()
     if status is False:
         sys.exit(1)
@@ -257,6 +257,7 @@ if __name__ == "__main__":
         tms_logger.log_debug("TCP configs have been parsed successfully")
 
     app = QApplication(sys.argv)
+
     host = "127.0.0.1"
     port = 65432
 

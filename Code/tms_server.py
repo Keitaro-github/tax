@@ -1,11 +1,11 @@
-from database_services import DatabaseServices
+from database import DatabaseServices
 import socket
 import json
 
 db_services = DatabaseServices("taxpayers.db")
 
 
-class Server:
+class TCPServer:
     """
     Represents a TCP server that listens for incoming connections and handles client requests.
 
@@ -104,14 +104,21 @@ class Server:
                 username = request_data["request"].get("username")
                 password = request_data["request"].get("password")
 
+                if not username or not password:
+                    response = "Username and password must be provided"
+                    client_socket_.sendall(response.encode())
+                    print("Sent response: 'Username and password must be provided'")
+                    return
+
                 result = db_services.check_credentials(username, password)
-                if result is True:
-                    # Create response using the same username and password divided by | symbol
+                if result:
                     response = "User logged in successfully"
                     client_socket_.sendall(response.encode())
+                    print("Sent response: 'User logged in successfully'")
                 else:
-                    response = "User was not logged in :-("
+                    response = "Invalid username or password"
                     client_socket_.sendall(response.encode())
+                    print("Sent response: 'Invalid username or password'")
 
             if command == "save_new_user":
                 national_id = request_data["request"].get("national_id")
@@ -143,6 +150,11 @@ class Server:
                 search_results = db_services.search_personal_info(national_id, first_name, last_name, date_of_birth)
                 if search_results is None or len(search_results) == 0:
                     response_data = {"command": "search_unsuccessful"}
+                    # Convert the response data to a JSON string
+                    response_message = json.dumps(response_data) + "\r\n"
+
+                    # Send the response message to the client
+                    client_socket_.sendall(response_message.encode())
                 else:
                     for user in search_results:
                         limited_user_info = {
@@ -228,7 +240,7 @@ class Server:
 
 if __name__ == '__main__':
     # Initialize the server instance
-    server = Server("127.0.0.1", 65432, new_user_window_instance=None)
+    server = TCPServer("127.0.0.1", 65432, new_user_window_instance=None)
 
     while True:
         client_socket, client_address = server.server_socket.accept()
