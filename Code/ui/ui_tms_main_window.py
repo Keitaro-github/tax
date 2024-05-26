@@ -1,7 +1,11 @@
 import sys
+import Code
+import json
 from PyQt6.QtWidgets import (QWidget, QApplication, QLabel, QHBoxLayout,
                              QTabWidget, QSplitter, QFormLayout, QMenuBar)
 from PyQt6.QtGui import (QAction)
+from Code.utils.tms_logs import TMSLogger
+from Code.utils import tms_logs
 from Code.ui.ui_new_user import NewUserWindow
 from Code.ui.ui_find_user import FindUserWindow
 from PyQt6.QtCore import pyqtSignal
@@ -14,7 +18,7 @@ class TMSMainWindow(QWidget):
 
     Attributes:
         username (str): The username of the TMS user.
-        password (int): The password of the TMS user.
+        password (str): The password of the TMS user.
         host (str): The hostname or IP address of the server to connect to.
         port (int): The port used by the server for the connection.
         main_layout (QVBoxLayout): A layout widget for organizing GUI components.
@@ -22,18 +26,21 @@ class TMSMainWindow(QWidget):
     """
 
     user_details_retrieved_signal = pyqtSignal(dict)
-    def __init__(self, username, password, host, port):
+
+    def __init__(self, tms_logger: TMSLogger, username: str, password: str, host: str, port: int):
         """
         Initializes a new instance of the TMSMainWindow class.
 
         Args:
+            tms_logger (TMSLogger): TMS Logger instance.
             username (str): The username of the TMS user.
-            password (int): The password of the TMS user.
+            password (str): The password of the TMS user.
             host (str): The server's hostname or IP address to connect to.
             port (int): The port used by the server to connect to.
         """
         super().__init__()
 
+        self.__tms_logger = tms_logger
         self.__username = username
         self.__password = password
         self.host = host
@@ -165,6 +172,8 @@ class TMSMainWindow(QWidget):
         self.__new_user_window = None
         self.__find_user_window = None
 
+        self.__tms_logger.log_debug("Main TMS window has been launched")
+
     def __show_new_user_window(self):
         """
         Displays NewUserWindow UI to create new user.
@@ -223,17 +232,42 @@ class TMSMainWindow(QWidget):
 
 
 if __name__ == "__main__":
+    # Create and setup TMS logger.
+    tms_logger = tms_logs.TMSLogger()
+    status = tms_logger.setup()
+    if status is False:
+        sys.exit(1)
+    # Get TCP configurations from external JSON file.
+    try:
+        with open(Code.TCP_CONFIGS, 'r') as tcp_config_file:
+            tcp_configs = json.loads(tcp_config_file.read())
+    except OSError:
+        tms_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
+        sys.exit(1)
+    else:
+        tms_logger.log_debug("TCP configs have been read successfully")
+    # Parse TCP configurations represented in JSON format.
+    try:
+        host = tcp_configs["host"]
+        port = tcp_configs["port"]
+    except KeyError as exception:
+        tms_logger.log_critical(exception)
+        sys.exit(1)
+    else:
+        tms_logger.log_debug("TCP configs have been parsed successfully")
+
     app = QApplication(sys.argv)
+
     host = "127.0.0.1"
     port = 65432
 
     try:
         username = sys.argv[1]
         password = sys.argv[2]
-        main_window = TMSMainWindow(username, password, host, port)
+        main_window = TMSMainWindow(tms_logger, username, password, host, port)
 
     except IndexError:
-        main_window = TMSMainWindow(None, None, host, port)
+        main_window = TMSMainWindow(tms_logger, None, None, host, port)
 
     main_window.show()
     sys.exit(app.exec())

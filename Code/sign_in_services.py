@@ -1,5 +1,3 @@
-import datetime
-import os
 import socket
 import json
 
@@ -8,83 +6,26 @@ terminal = False
 history = False
 
 
-def create_history_file():
-    global file_name
-
-    timestamp = datetime.datetime.now()
-    file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
-    file_name = 'History_' + file_timestamp + '.txt'
-    interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
-    file_timestamp = timestamp.strftime('%Y%m%d_%H%M%S')
-
-    # Get current module location.
-    current_folder = os.getcwd()
-    #  Create "cache" folder pathname.
-    cache_folder = os.path.join(current_folder, "cache")
-    # Check whether cache folder has not been created yet.
-    if not os.path.isdir(cache_folder):
-        # Create cache folder on PC for storing all histories.
-        os.mkdir(cache_folder)
-    # Create absolute history filename based on full path to cache folder and history filename.
-    file_name = os.path.join(cache_folder, 'History_' + file_timestamp + '.txt')
-
-    with open(file_name, 'w') as history_file:
-        history_file.write(str(interaction_timestamp).strip() + ' The program initiated.\n')
-
-
-def write_history_file(message):
-    global file_name
-
-    timestamp = datetime.datetime.now()
-    interaction_timestamp = timestamp.strftime('%Y/%m/%d %H:%M:%S\n')
-
-    if file_name is None:
-        print('Please create file first.')
-        return False
-    if not os.path.isfile(file_name):
-        print('The file does not exist.')
-        return False
-    try:
-        with open(file_name, 'a') as history_file:
-            history_file.write(str(interaction_timestamp).strip() + ' ' + message)
-    except OSError:
-        print('Error happened while accessing history file.')
-        return False
-    return True
-
-
-def output(message):
-    if terminal is True:
-        print(message)
-    if history is True:
-        write_history_file(message + '\n')
-
-
 def validate_password(password):
     password_length = len(password)
     password_digits_only = str.isdigit(password)
     password_alphabets_only = str.isalpha(password)
 
     if password_length <= 7:
-        output('Too short password!')
         return False
     elif password_digits_only is True:
-        output('Password must contain letters!')
         return False
     elif password_alphabets_only is True:
-        output('Password must contain digits!')
         return False
     elif password.islower() is True:
-        output('Password must contain uppercase letters!')
         return False
     elif password.isupper() is True:
-        output('Password must contain lowercase letters!')
         return False
     else:
         return True
 
 
-class Client:
+class TCPClient:
     def __init__(self, host, port, username=None, password=None):
         self.host = host  # The server's hostname or IP address
         self.port = port  # The port used by the server
@@ -128,11 +69,14 @@ class Client:
             # Send the JSON-formatted message over the socket
             client_socket.sendall(message_json_with_delimiter)
 
-            response = client_socket.recv(1024).decode()
+            response = client_socket.recv(1024).decode().strip('')
+            print(f"Received response: {response!r}")
 
             if response == "User logged in successfully":
                 return True
-            elif response == "User was not logged in :-(":
+            elif response == "Username and password must be provided":
+                return False
+            elif response == "Invalid username or password":
                 return False
             else:
                 print("Server response error")
