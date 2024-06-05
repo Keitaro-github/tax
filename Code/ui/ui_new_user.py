@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLab
                              QRadioButton, QButtonGroup, QDateEdit, QMessageBox, QComboBox, QSpinBox)
 from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtCore import QRegularExpression, pyqtSignal
-import socket
+import Code.tcp_ip.tcp_driver as tcp_driver
+from Code.utils.tms_logs import TMSLogger
 import json
 
 
@@ -19,17 +20,20 @@ class NewUserWindow(QWidget):
     # Define the user_saved signal
     user_saved = pyqtSignal()
 
-    def __init__(self, host, port):
+    def __init__(self, client_logger: TMSLogger, host, port):
         """
         Initializes a new instance of the NewUserWindow class.
 
         Args:
-           host (str): The server's hostname or IP address to connect to.
-           port (int): The port used by the server to connect to.
+            client_logger (logging.Logger): An instance of the logger.
+            host (str): The server's hostname or IP address to connect to.
+            port (int): The port used by the server to connect to.
         """
-        super().__init__()  # Initialize default constructor of parent class
-        self.host = host  # Define the host attribute
-        self.port = port  # Define the port attribute
+        super().__init__()
+        self.__client_logger = client_logger
+        self.host = host
+        self.port = port
+        self.tcp_client = tcp_driver.TCPClient(client_logger, host, port)
 
         # Call PyQt6 API to set current window's title.
         self.setWindowTitle("New user")
@@ -198,6 +202,8 @@ class NewUserWindow(QWidget):
         self.__main_layout.addLayout(layout_marital_status)
         self.__main_layout.addLayout(button_layout)
 
+        self.__client_logger.log_debug("New User Window has been initialized successfully")
+
     def __handle_widget_edit(self):
         """
         A slot method that handles the Editing finished signal for various widgets.
@@ -208,7 +214,8 @@ class NewUserWindow(QWidget):
             # Change the text color to black once the widget is edited
             self.__set_widget_color(sender, "black")
 
-    def __set_widget_color(self, widget, color):
+    @staticmethod
+    def __set_widget_color(widget, color):
         """
         Changes text color to black once editing is finished.
         """
@@ -310,16 +317,19 @@ class NewUserWindow(QWidget):
                                             address_zip_code, address_city, address_street, address_house_number,
                                             phone_country_code, phone_number, marital_status):
             self.__missing_data_message()
+            self.__client_logger.log_debug(f"Form incomplete")
             return
 
         if self.__are_all_fields_filled(national_id, first_name, last_name, date_of_birth, gender, address_country,
                                         address_zip_code, address_city, address_street, address_house_number,
                                         phone_country_code, phone_number, marital_status):
             self.__saved_successfully_message()
+            self.__client_logger.log_debug(f"Form complete")
             self.close()
 
         else:
             self.__unexpected_error_message()
+            self.__client_logger.log_error(f"Unexpected error")
 
         # Call the function to save new user with the collected data
         self.save_new_user_request(national_id, first_name, last_name, date_of_birth, gender, address_country,
@@ -366,66 +376,61 @@ class NewUserWindow(QWidget):
             # Split the country code from the phone number
             phone_country_code = phone_country_code.split()[1]
             # Create a socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                # Connect to the server
-                client_socket.connect((self.host, self.port))
 
-                header_data = {
-                    "Content-Type": "application/json",
-                    "Encoding": "utf-8"
-                }
+            header_data = {
+                "Content-Type": "application/json",
+                "Encoding": "utf-8"
+            }
 
-                request_data = {
-                    "command": "save_new_user",
-                    "national_id": national_id,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "date_of_birth": date_of_birth,
-                    "gender": gender,
-                    "address_country": address_country,
-                    "address_zip_code": address_zip_code,
-                    "address_city": address_city,
-                    "address_street": address_street,
-                    "address_house_number": address_house_number,
-                    "phone_country_code": phone_country_code,
-                    "phone_number": phone_number,
-                    "marital_status": marital_status
-                }
+            request_data = {
+                "command": "save_new_user",
+                "national_id": national_id,
+                "first_name": first_name,
+                "last_name": last_name,
+                "date_of_birth": date_of_birth,
+                "gender": gender,
+                "address_country": address_country,
+                "address_zip_code": address_zip_code,
+                "address_city": address_city,
+                "address_street": address_street,
+                "address_house_number": address_house_number,
+                "phone_country_code": phone_country_code,
+                "phone_number": phone_number,
+                "marital_status": marital_status
+            }
 
-                # Combine header and request data into a single dictionary
-                message = {
-                    "header": header_data,
-                    "request": request_data
-                }
+            # Combine header and request data into a single dictionary
+            message = {
+                "header": header_data,
+                "request": request_data
+            }
 
-                # Serialize the combined dictionary into JSON format
-                message_json = json.dumps(message)
+            # Serialize the combined dictionary into JSON format
+            message_json = json.dumps(message)
 
-                # Define a delimiter to mark the end of the message
-                delimiter = b'\r\n'
+            # Define a delimiter to mark the end of the message
+            delimiter = b'\r\n'
 
-                # Append the delimiter to the serialized message
-                message_json_with_delimiter = message_json.encode() + delimiter
+            # Append the delimiter to the serialized message
+            request = message_json.encode() + delimiter
 
-                # Send the JSON-formatted message over the socket
-                client_socket.sendall(message_json_with_delimiter)
+            response = self.tcp_client.send_request(request)
+            self.__client_logger.log_debug(f"TMS server response is {response}")
 
-                response = client_socket.recv(1024).decode()
-
-                if response == "New user saved successfully":
-                    self.__saved_successfully_message()
-                    self.user_saved.emit()
-                    print("New user saved successfully")
-                    return True
-                elif response == "User was not saved :-(":
-                    self.__unexpected_error_message()
-                    print("User was not saved :-(")
-                    return False
-                else:
-                    print("Server response error 'here'")
-                    return False
+            if response == "New user saved successfully":
+                self.__saved_successfully_message()
+                self.user_saved.emit()
+                self.__client_logger.log_debug(f"New user saved successfully")
+                return True
+            elif response == "New user was not saved":
+                self.__unexpected_error_message()
+                self.__client_logger.log_debug(f"New user was not saved")
+                return False
+            else:
+                self.__client_logger.log_debug(f"Unexpected server response: {response}")
+                return False
         except Exception as exception:
-            print("Error", exception)
+            self.__client_logger.log_debug(f"Unexpected exception: {exception}")
             return False
 
     def __enforce_min_length(self):
@@ -440,6 +445,7 @@ class NewUserWindow(QWidget):
             min_length = 9
         else:
             self.__unexpected_error_message()
+            self.__client_logger.log_debug(f"Unexpected sender widget: {sender_widget}")
             return
 
         if len(sender_widget.text()) < min_length:
@@ -492,10 +498,17 @@ class NewUserWindow(QWidget):
 
 
 if __name__ == "__main__":
+
+    client_logger = TMSLogger("client")
+    if not client_logger.setup():
+        sys.exit(1)
+
+    client_logger.log_debug("Client logger has been set up successfully")
+
     application = QApplication(sys.argv)
     host = "127.0.0.1"
     port = 65432
-    user = NewUserWindow(host, port)
+    user = NewUserWindow(client_logger, host, port)
 
     # Define a slot to close the window
     def close_window():

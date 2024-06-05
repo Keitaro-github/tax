@@ -5,9 +5,8 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLab
 from PyQt6.QtCore import pyqtSignal, QObject
 import Code
 import Code.tcp_ip.tcp_driver as tcp_driver
-import Code.sign_in_services as sign_in_services
 import Code.ui.ui_tms_main_window as ui_tms_main_window
-from Code.utils import tms_logs
+from Code.utils.tms_logs import TMSLogger
 from PyQt6.QtCore import QTimer
 import threading
 
@@ -26,19 +25,22 @@ def thread_run_sign_in_window(*args):
     Returns: None
     """
 
+    client_logger = None
+
     try:
-        tms_logger = args[0]
+        client_logger = args[0]
         host = args[1]
         port = args[2]
 
-        tms_logger.log_debug("Sign in window thread has been launched")
+        client_logger.log_debug("Sign in window thread has been launched")
 
         application = QApplication(sys.argv)
-        sign_in_window = SignInWindow(tms_logger, host, port)
+        sign_in_window = SignInWindow(client_logger, host, port)
         sign_in_window.show()
         sys.exit(application.exec())
 
-    except Exception as error:
+    except Exception as exception:
+        client_logger.log_error(f"Unexpected exception: {exception}")
         pass
 
 
@@ -50,15 +52,17 @@ def thread_sign_in_request(*args):
     Returns: None
     """
 
+    client_logger = None
+
     try:
-        tms_logger = args[0]
+        client_logger = args[0]
         host = args[1]
         port = args[2]
         username = args[3]
         password = args[4]
         signal = args[5]
 
-        tms_logger.log_debug("Sign in thread has been launched")
+        client_logger.log_debug("Sign in thread has been launched")
 
         header_data = {
             "Content-Type": "application/json",
@@ -86,11 +90,11 @@ def thread_sign_in_request(*args):
         # Append the delimiter to the serialized message
         request = message_json.encode() + delimiter
 
-        tcp_client = tcp_driver.TCPClient(tms_logger, host, port)
+        tcp_client = tcp_driver.TCPClient(client_logger, host, port)
 
         response = tcp_client.send_request(request)
 
-        tms_logger.log_debug(f"TMS server response is {response}")
+        client_logger.log_debug(f"TMS server response is {response}")
 
         try:
             if response["error"] != 0:
@@ -103,15 +107,15 @@ def thread_sign_in_request(*args):
                 elif response["response"] == "Invalid username or password":
                     SignInWindow.request_status = False
                 else:
-                    print("Server response error")
+                    client_logger.debug(f"Server response error")
                     SignInWindow.request_status = False
         except KeyError:
             SignInWindow.request_status = False
-            tms_logger.log_debug(f"Could not parse the response")
+            client_logger.log_error(f"Could not parse the response")
 
         signal.emit()
-    except Exception as error:
-        print(error)
+    except Exception as exception:
+        client_logger.log_error(f"Unexpected exception: {exception}")
 
 
 def run_main_tms_window(*args):
@@ -123,21 +127,22 @@ def run_main_tms_window(*args):
     """
 
     try:
-        tms_logger = args[0]
+        client_logger = args[0]
         host = args[1]
         port = args[2]
         username = args[3]
         password = args[4]
 
-        tms_logger.log_debug("Main TMS window thread has been launched")
+        client_logger.log_debug("Main TMS window thread has been launched")
 
         app = QApplication(sys.argv)
-        main_window = ui_tms_main_window.TMSMainWindow(tms_logger, username, password, host, port)
+        main_window = ui_tms_main_window.TMSMainWindow(client_logger, username, password, host, port)
         main_window.show()
         sys.exit(app.exec())
 
-    except Exception as error:
-        print(f"Could not run Main TMS window. Error: {error}")
+
+    except Exception as exception:
+        client_logger.log_error(f"Unexpected exception: {exception}")
 
 
 class SignInWindow(QWidget):
@@ -154,9 +159,9 @@ class SignInWindow(QWidget):
     request_complete = Communicate()
     request_status = False
 
-    def __init__(self, tms_logger, host, port):
+    def __init__(self, client_logger, host, port):
         super().__init__()  # Initialize default constructor of parent class
-        self.__tms_logger = tms_logger
+        self.__client_logger = client_logger
         self.host = host  # Define the host attribute
         self.port = port  # Define the port attribute
 
@@ -246,14 +251,14 @@ class SignInWindow(QWidget):
 
         self.__button_clicked = False
 
-        self.__tms_logger.log_debug("Sign In Window has been initialized successfully")
+        self.__client_logger.log_debug("Sign In Window has been initialized successfully")
 
     def __session_timeout(self):
         """
         Handles session timeout.
         """
 
-        self.__tms_logger.log_debug("Sign in session timeout occurred")
+        self.__client_logger.log_debug("Sign in session timeout occurred")
         self.__sign_in_time_out_message()
         self.__timer.stop()
         self.close()
@@ -264,10 +269,10 @@ class SignInWindow(QWidget):
         """
 
         if self.__hide_checkbox.isChecked() is True:
-            self.__tms_logger.log_debug("Hide checkbox has been checked")
+            self.__client_logger.log_debug("Hide checkbox has been checked")
             self.__password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         else:
-            self.__tms_logger.log_debug("Hide checkbox has been unchecked")
+            self.__client_logger.log_debug("Hide checkbox has been unchecked")
             self.__password_edit.setEchoMode(QLineEdit.EchoMode.Normal)
 
     def __click_sign_in_button(self):
@@ -279,7 +284,7 @@ class SignInWindow(QWidget):
         - Displays success or failure messages accordingly.
         """
 
-        self.__tms_logger.log_debug("Sign in button has been clicked")
+        self.__client_logger.log_debug("Sign in button has been clicked")
 
         self.__timer.start(180000)
 
@@ -301,7 +306,7 @@ class SignInWindow(QWidget):
         # Create separate thread THREAD_SIGN_IN_REQUEST intended to send TCP sign in request.
         sign_in_request_thread = threading.Thread(target=thread_sign_in_request,
                                                  name="THREAD_SIGN_IN_REQUEST",
-                                                 args=(self.__tms_logger,
+                                                 args=(self.__client_logger,
                                                        self.host,
                                                        self.port,
                                                        username,
@@ -321,17 +326,17 @@ class SignInWindow(QWidget):
         Returns: None
 
         """
-        self.__tms_logger.log_debug(f"Request status received with result: {self.__class__.request_status}")
+        self.__client_logger.log_debug(f"Request status received with result: {self.__class__.request_status}")
 
         if self.__class__.request_status is True:
-            self.__tms_logger.log_debug("Sign in procedure has been completed successfully")
+            self.__client_logger.log_debug("Sign in procedure has been completed successfully")
             self.__sign_in_success_message()
             self.__timer.stop()
             self.close()
             return True
 
         elif self.__class__.request_status is False:
-            self.__tms_logger.log_debug("Sign in procedure has been completed unsuccessfully")
+            self.__client_logger.log_debug("Sign in procedure has been completed unsuccessfully")
             self.__attempt_count += 1
             self.__sign_in_failure_message()
 
@@ -347,7 +352,7 @@ class SignInWindow(QWidget):
         - Closes the sign-in window.
         """
 
-        self.__tms_logger.log_debug("Cancel button has been clicked. Close application.")
+        self.__client_logger.log_debug("Cancel button has been clicked. Close application.")
         self.close()
 
     def __sign_in_success_message(self):
@@ -355,7 +360,7 @@ class SignInWindow(QWidget):
         Displays a confirmation message when sign-in is successful.
         """
 
-        self.__tms_logger.log_debug(f"Pop up: sign-in is successful")
+        self.__client_logger.log_debug(f"Pop up: sign-in is successful")
 
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Sign in successful")
@@ -367,7 +372,7 @@ class SignInWindow(QWidget):
         Displays a warning message when sign-in fails due to incorrect credentials.
         """
 
-        self.__tms_logger.log_info(f"Pop up: incorrect credentials")
+        self.__client_logger.log_info(f"Pop up: incorrect credentials")
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -380,7 +385,7 @@ class SignInWindow(QWidget):
         Displays a warning message when no credentials are entered.
         """
 
-        self.__tms_logger.log_info(f"Pop up: no credentials are entered")
+        self.__client_logger.log_info(f"Pop up: no credentials are entered")
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
@@ -394,7 +399,7 @@ class SignInWindow(QWidget):
         - Disables sign-in and cancel buttons, password and username fields, and the hide checkbox.
         """
 
-        self.__tms_logger.log_info(f"Pop up: attempts limit is reached")
+        self.__client_logger.log_info(f"Pop up: attempts limit is reached")
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)
@@ -413,7 +418,7 @@ class SignInWindow(QWidget):
         - Disables sign-in and cancel buttons, password and username fields, and the hide checkbox.
         """
 
-        self.__tms_logger.log_info(f"Pop up: sign-in session times out")
+        self.__client_logger.log_info(f"Pop up: sign-in session times out")
 
         warning_dialog = QMessageBox(self)
         warning_dialog.setIcon(QMessageBox.Icon.Critical)
@@ -429,38 +434,37 @@ class SignInWindow(QWidget):
 
 if __name__ == "__main__":
 
-    # Create and setup TMS logger.
-    tms_logger = tms_logs.TMSLogger()
-    status = tms_logger.setup()
-    if status is False:
+    client_logger = TMSLogger("client")
+    if not client_logger.setup():
         sys.exit(1)
+
     # Get TCP configurations from external JSON file.
     try:
         with open(Code.TCP_CONFIGS, 'r') as tcp_config_file:
             tcp_configs = json.loads(tcp_config_file.read())
     except OSError:
-        tms_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
+        client_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
         sys.exit(1)
     else:
-        tms_logger.log_debug("TCP configs have been read successfully")
+        client_logger.log_debug("TCP configs have been read successfully")
     # Parse TCP configurations represented in JSON format.
     try:
         host = tcp_configs["host"]
         port = tcp_configs["port"]
     except KeyError as exception:
-        tms_logger.log_critical(exception)
+        client_logger.log_critical(exception)
         sys.exit(1)
     else:
-        tms_logger.log_debug("TCP configs have been parsed successfully")
+        client_logger.log_debug("TCP configs have been parsed successfully")
 
     # Create separate thread to run Sign In Window independently on Main thread.
     run_sign_in_thread = threading.Thread(name="THREAD_RUN_SIGN_IN_WINDOW",
                                           target=thread_run_sign_in_window,
-                                          args=(tms_logger, host, port))
+                                          args=(client_logger, host, port))
     # Launch separate thread THREAD_RUN_SIGN_IN_WINDOW.
     run_sign_in_thread.start()
     # Suspend Main thread at this point until THREAD_RUN_SIGN_IN_WINDOW is terminated.
     run_sign_in_thread.join()
 
     if SignInWindow.request_status:
-        run_main_tms_window(tms_logger, host, port, None, None,)
+        run_main_tms_window(client_logger, host, port, None, None,)

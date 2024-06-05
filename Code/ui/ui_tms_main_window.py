@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (QWidget, QApplication, QLabel, QHBoxLayout,
                              QTabWidget, QSplitter, QFormLayout, QMenuBar)
 from PyQt6.QtGui import (QAction)
 from Code.utils.tms_logs import TMSLogger
-from Code.utils import tms_logs
 from Code.ui.ui_new_user import NewUserWindow
 from Code.ui.ui_find_user import FindUserWindow
 from PyQt6.QtCore import pyqtSignal
@@ -27,12 +26,12 @@ class TMSMainWindow(QWidget):
 
     user_details_retrieved_signal = pyqtSignal(dict)
 
-    def __init__(self, tms_logger: TMSLogger, username: str, password: str, host: str, port: int):
+    def __init__(self, client_logger: TMSLogger, username: str, password: str, host: str, port: int):
         """
         Initializes a new instance of the TMSMainWindow class.
 
         Args:
-            tms_logger (TMSLogger): TMS Logger instance.
+            client_logger (TMSLogger): TMS Logger instance.
             username (str): The username of the TMS user.
             password (str): The password of the TMS user.
             host (str): The server's hostname or IP address to connect to.
@@ -40,7 +39,7 @@ class TMSMainWindow(QWidget):
         """
         super().__init__()
 
-        self.__tms_logger = tms_logger
+        self.__client_logger = client_logger
         self.__username = username
         self.__password = password
         self.host = host
@@ -172,14 +171,14 @@ class TMSMainWindow(QWidget):
         self.__new_user_window = None
         self.__find_user_window = None
 
-        self.__tms_logger.log_debug("Main TMS window has been launched")
+        self.__client_logger.log_debug("Main TMS window has been launched")
 
     def __show_new_user_window(self):
         """
         Displays NewUserWindow UI to create new user.
         """
 
-        self.__new_user_window = NewUserWindow(self.host, self.port)
+        self.__new_user_window = NewUserWindow(self.__client_logger, self.host, self.port)
         self.__new_user_window.show()
 
     def __show_find_user_window(self):
@@ -187,14 +186,14 @@ class TMSMainWindow(QWidget):
         Displays FindUserWindow UI to find user.
         """
 
-        self.__find_user_window = FindUserWindow(self.host, self.port, main_window=self)
+        self.__find_user_window = FindUserWindow(self.__client_logger, self.host, self.port, main_window=self)
         self.__find_user_window.show()
 
     def populate_user_information(self, user_details):
         """
         Populates the main window with the retrieved user information.
         """
-        print("Received user details:", user_details)
+        self.__client_logger.log_debug(f"Received user details: {user_details}")
         try:
             if user_details is not None:
                 # Update labels with user information
@@ -204,7 +203,7 @@ class TMSMainWindow(QWidget):
                 self.label_gender.setText(f"Gender: {user_details['gender']}")
                 address_country = user_details.get('address_country', '')
                 address_zip_code = user_details.get('address_zip_code', '')
-                address_zip_code = address_zip_code.lstrip('*')
+                # address_zip_code = address_zip_code.lstrip('*')
                 address_city = user_details.get('address_city', '')
                 address_street = user_details.get('address_street', '')
                 address_house_number = user_details.get('address_house_number', '')
@@ -213,61 +212,72 @@ class TMSMainWindow(QWidget):
                 self.label_address.setText(f"Address: {address_text}")
                 phone_country_code = user_details.get('phone_country_code', '')
                 phone_number = user_details.get('phone_number', '')
-                phone_text = f"+{phone_country_code} {phone_number}"
+                phone_text = f"{phone_country_code} {phone_number}"
                 self.label_phone_number.setText(f"Phone number: {phone_text}")
                 self.label_marital_status.setText(f"Marital status: {user_details['marital_status']}")
-                self.label_tax_rate.setText(f"Tax rate: {user_details['tax_rate']}")
-                self.label_yearly_income.setText(f"Yearly income: {user_details['yearly_income']}")
-                self.label_advance_tax.setText(f"Advance tax: {user_details['advance_tax']}")
-                self.label_tax_paid_this_year.setText(f"Tax paid this year: {user_details['tax_paid_this_year']}")
-                self.label_property_value.setText(f"Property value: {user_details['property_value']}")
-                self.label_loans.setText(f"Loans: {user_details['loans']}")
-                self.label_property_tax.setText(f"Property tax: {user_details['property_tax']}")
 
-                print("User information populated successfully.")  # Debugging output
+                # Format numerical fields with commas, defaulting to empty string if None
+                yearly_income = f"{user_details['yearly_income']:,}" if user_details['yearly_income'] is not None else ''
+                advance_tax = f"{user_details['advance_tax']:,}" if user_details['advance_tax'] is not None else ''
+                tax_paid_this_year = f"{user_details['tax_paid_this_year']:,}" if user_details[
+                                                                                      'tax_paid_this_year'] is not None else ''
+                property_value = f"{user_details['property_value']:,}" if user_details[
+                                                                              'property_value'] is not None else ''
+                loans = f"{user_details['loans']:,}" if user_details['loans'] is not None else ''
+                property_tax = f"{user_details['property_tax']:,}" if user_details['property_tax'] is not None else ''
+
+                self.label_tax_rate.setText(f"Tax rate: {user_details['tax_rate']}")
+                self.label_yearly_income.setText(f"Yearly income: {yearly_income}")
+                self.label_advance_tax.setText(f"Advance tax: {advance_tax}")
+                self.label_tax_paid_this_year.setText(f"Tax paid this year: {tax_paid_this_year}")
+                self.label_property_value.setText(f"Property value: {property_value}")
+                self.label_loans.setText(f"Loans: {loans}")
+                self.label_property_tax.setText(f"Property tax: {property_tax}")
+
+                self.__client_logger.log_debug("User information populated successfully")
             else:
-                print("User details are None. Unable to populate information.")  # Debugging output
+                self.__client_logger.log_debug("User details are None")
         except Exception as exception:
-            print("Error while populating user information:", exception)  # Error handling
+            self.__client_logger.log_debug(f"Unexpected exception: {exception}")
 
 
 if __name__ == "__main__":
-    # Create and setup TMS logger.
-    tms_logger = tms_logs.TMSLogger()
-    status = tms_logger.setup()
-    if status is False:
+
+    client_logger = TMSLogger("client")
+    if not client_logger.setup():
         sys.exit(1)
-    # Get TCP configurations from external JSON file.
+
     try:
         with open(Code.TCP_CONFIGS, 'r') as tcp_config_file:
             tcp_configs = json.loads(tcp_config_file.read())
     except OSError:
-        tms_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
+        client_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
         sys.exit(1)
     else:
-        tms_logger.log_debug("TCP configs have been read successfully")
+        client_logger.log_debug("TCP configs have been read successfully")
     # Parse TCP configurations represented in JSON format.
     try:
         host = tcp_configs["host"]
         port = tcp_configs["port"]
     except KeyError as exception:
-        tms_logger.log_critical(exception)
+        client_logger.log_critical(f"Unexpected exception: {exception}")
         sys.exit(1)
     else:
-        tms_logger.log_debug("TCP configs have been parsed successfully")
+        client_logger.log_debug("TCP configs have been parsed successfully")
 
     app = QApplication(sys.argv)
 
-    host = "127.0.0.1"
-    port = 65432
+    username = None
+    password = None
 
-    try:
-        username = sys.argv[1]
-        password = sys.argv[2]
-        main_window = TMSMainWindow(tms_logger, username, password, host, port)
+    # try:
+        # username = sys.argv[1]
+        # password = sys.argv[2]
+    main_window = TMSMainWindow(client_logger, username, password, host, port)
 
-    except IndexError:
-        main_window = TMSMainWindow(tms_logger, None, None, host, port)
+    # except IndexError as error:
+    #     client_logger.log_error(f"Unexpected error: {error}")
+    #     main_window = TMSMainWindow(client_logger, None, None, host, port)
 
     main_window.show()
     sys.exit(app.exec())

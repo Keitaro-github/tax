@@ -1,6 +1,9 @@
 from database import DatabaseServices
 import socket
 import json
+import datetime
+import sys
+from Code.utils import tms_logs
 
 db_services = DatabaseServices("taxpayers.db")
 
@@ -35,7 +38,7 @@ class TCPServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(5)
-        print("Server is listening on", (self.host, self.port))
+        server_logger.log_debug(f"Server is listening on: {self. host, self. port}")
 
     def __del__(self):
         """
@@ -92,11 +95,11 @@ class TCPServer:
         try:
             # Receive header
             message_data = self.recv_until(client_socket_, b'\r\n').decode().strip()
-            print("Received message:", message_data)
+            server_logger.log_debug(f"Received message: {message_data}")
 
             # Process the request
             request_data = json.loads(message_data)
-            print("Parsed request data:", request_data)  # Debugging statement
+            server_logger.log_debug(f"Parsed request data: {request_data}")
 
             command = request_data["request"].get("command")
 
@@ -107,18 +110,20 @@ class TCPServer:
                 if not username or not password:
                     response = "Username and password must be provided"
                     client_socket_.sendall(response.encode())
-                    print("Sent response: 'Username and password must be provided'")
+                    server_logger.log_debug(f"Sent response: 'Username and password must be provided'")
                     return
 
                 result = db_services.check_credentials(username, password)
                 if result:
                     response = "User logged in successfully"
                     client_socket_.sendall(response.encode())
-                    print("Sent response: 'User logged in successfully'")
+                    server_logger.log_debug(f"Sent response: 'User logged in successfully'")
+
                 else:
                     response = "Invalid username or password"
                     client_socket_.sendall(response.encode())
-                    print("Sent response: 'Invalid username or password'")
+                    server_logger.log_debug(f"Sent response: 'Invalid username or password'")
+
 
             if command == "save_new_user":
                 national_id = request_data["request"].get("national_id")
@@ -138,7 +143,7 @@ class TCPServer:
                 result = db_services.save_to_sql(national_id, first_name, last_name, date_of_birth, gender,
                                                  address_country, address_zip_code, address_city, address_street,
                                                  address_house_number, phone_country_code, phone_number, marital_status)
-                response = "User saved successfully"
+                response = "New user saved successfully"
                 client_socket_.sendall(response.encode())
 
             if command == "find_user":
@@ -147,7 +152,15 @@ class TCPServer:
                 last_name = request_data["request"].get("last_name")
                 date_of_birth = request_data["request"].get("date_of_birth")
 
-                search_results = db_services.search_personal_info(national_id, first_name, last_name, date_of_birth)
+                # Initialize formatted_date_of_birth to None
+                formatted_date_of_birth = None
+
+                # Reformat the date_of_birth to the SQL format (YYYY-MM-DD) if it's not None
+                if date_of_birth is not None:
+                    formatted_date_of_birth = datetime.datetime.strptime(date_of_birth, "%d.%m.%Y").strftime("%Y-%m-%d")
+
+                search_results = db_services.search_personal_info(national_id, first_name, last_name,
+                                                                  formatted_date_of_birth)
                 if search_results is None or len(search_results) == 0:
                     response_data = {"command": "search_unsuccessful"}
                     # Convert the response data to a JSON string
@@ -165,29 +178,27 @@ class TCPServer:
                         }
                         # Append user details to the list
                         user_info_list.append(limited_user_info)
-                    print("result 1", user_info_list)
+                        server_logger.log_debug(f"Result: {user_info_list}")
 
-                # Create the response message
-                response_data = {
-                    "command": "search_successful",
-                    "user_info": user_info_list
-                }
+                    # Create the response message
+                    response_data = {
+                        "command": "search_successful",
+                        "user_info": user_info_list
+                    }
 
-                # Print the message before sending it to the client
-                print("Response message sent to client:", response_data)
+                    server_logger.log_debug(f"Response message sent to client: {response_data}")
 
-                # Convert the response data to a JSON string
-                response_message = json.dumps(response_data) + "\r\n"
+                    # Convert the response data to a JSON string
+                    response_message = json.dumps(response_data) + "\r\n"
 
-                # Send the response message to the client
-                client_socket_.sendall(response_message.encode())
+                    # Send the response message to the client
+                    client_socket_.sendall(response_message.encode())
 
             if command == "retrieve_user_details":
                 national_id = request_data["request"].get("national_id")
 
                 search_results = db_services.retrieve_user_details(national_id)
                 if search_results is None:
-                    # If no user found, send an unsuccessful search response
                     response_data = {"command": "retrieving_unsuccessful"}
 
                 else:
@@ -216,15 +227,14 @@ class TCPServer:
                             "property_tax": user_info[21],
                         }
                         complete_user_info_list.append(complete_user_info)
-                        print("Complete_user_info_list", complete_user_info_list)
+                        server_logger.log_debug(f"Complete_user_info_list: {complete_user_info_list}")
 
                     response_data = {
                         "command": "retrieving_successful",
                         "user_info": complete_user_info_list
                     }
 
-                # Print the message before sending it to the client
-                print("Response message sent to client:", response_data)
+                server_logger.log_debug(f"Response message sent to client: {response_data}")
 
                 # Convert the response data to a JSON string
                 response_message = json.dumps(response_data) + "\r\n"
@@ -233,17 +243,22 @@ class TCPServer:
                 client_socket_.sendall(response_message.encode())
 
         except Exception as exception:
-            print("Error processing request:", exception)
+            server_logger.log_error(f"Unexpected exception: {exception}")
         finally:
             client_socket_.close()
 
 
 if __name__ == '__main__':
+    # Create a TMSLogger instance for the server
+    server_logger = tms_logs.TMSLogger("server")
+    if not server_logger.setup():
+        sys.exit(1)
+        
     # Initialize the server instance
     server = TCPServer("127.0.0.1", 65432, new_user_window_instance=None)
 
     while True:
         client_socket, client_address = server.server_socket.accept()
-        print("Connected client:", client_address)
+        server_logger.log_debug(f"Connected client: {client_address}")
         server.handle_request(client_socket)
     sys.exit(0)

@@ -4,6 +4,8 @@ import json
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QVBoxLayout, QHBoxLayout,
                              QDateEdit, QMessageBox, QComboBox, QSpinBox)
 from PyQt6.QtCore import QDate, pyqtSignal
+import Code.tcp_ip.tcp_driver as tcp_driver
+from Code.utils.tms_logs import TMSLogger
 
 
 class FindUserWindow(QWidget):
@@ -16,22 +18,29 @@ class FindUserWindow(QWidget):
         main_window (FindUserWindow): An instance of the FindUserWindow class.
         __main_layout (QVBoxLayout): A layout widget for organizing GUI components.
     """
+
     # Define the user_saved signal
     request_complete = pyqtSignal()
 
-    def __init__(self, host, port, main_window):
+    def __init__(self, client_logger: TMSLogger, host, port, main_window):
         """
         Initializes a new instance of the FindUserWindow class.
 
         Args:
-           host (str): The server's hostname or IP address to connect to.
-           port (int): The port used by the server to connect to.
-           main_window (TMSMainWindow): An instance of the TMSMainWindow class.
+            client_logger (logging.Logger): An instance of the logger.
+            host (str): The server's hostname or IP address to connect to.
+            port (int): The port used by the server to connect to.
+            main_window (TMSMainWindow): An instance of the TMSMainWindow class.
         """
-        super().__init__()  # Initialize default constructor of parent class
-        self.host = host  # Define the host attribute
-        self.port = port  # Define the port attribute
+
+        super().__init__()
+        self.__client_logger = client_logger
+        self.host = host
+        self.port = port
+        self.tcp_client = tcp_driver.TCPClient(client_logger, host, port)
         self.__main_window = main_window
+        # Flag to track date changes
+        self.__date_of_birth_changed = False
         # Call PyQt6 API to set current window's title.
         self.setWindowTitle("Find user")
         # Call PyQt6 API to create a layout where all UI components are placed.
@@ -139,12 +148,17 @@ class FindUserWindow(QWidget):
         self.__main_layout.addLayout(layout_search_results)
         self.__main_layout.addLayout(button_layout)
 
+        self.__client_logger.log_debug("Find User Window has been initialized successfully")
+
     def __handle_widget_edit(self):
         """
         A slot method that handles the Editing finished signal for various widgets.
         """
 
         sender = self.sender()
+        if isinstance(sender, QDateEdit):
+            # Mark date as changed
+            self.__date_of_birth_changed = True
         if isinstance(sender, (QComboBox, QDateEdit, QSpinBox)):
             # Change the text color to black once the widget is edited
             self.__set_widget_color(sender, "black")
@@ -154,10 +168,11 @@ class FindUserWindow(QWidget):
         """
         Changes text color to black once editing is finished.
         """
+
         widget.setStyleSheet(f"{widget.metaObject().className()} {{ color: {color}; }}")
 
     @staticmethod
-    def __are_required_fields_filled(national_id, first_name, last_name, date_of_birth):
+    def __are_required_fields_filled(national_id, first_name, last_name, date_changed):
         """
         Checks if any of the 4 fields are filled: national_id, first_name, last_name or date_of_birth.
 
@@ -167,27 +182,27 @@ class FindUserWindow(QWidget):
         :type first_name: str
         :param last_name: The last name  of user.
         :type last_name: str
-        :param date_of_birth: The date of birth of the user in the format 'dd.MM.yyyy'.
-        :type date_of_birth: str
+        :param date_changed: The changed date of birth of the user in the format 'dd.MM.yyyy'.
+        :type date_changed: str
         :return: True if any of the required fields are filled or the date_of_birth is not the current date, False
         otherwise.
         :rtype: bool
         """
-        current_date = QDate.currentDate()
-        date_of_birth_qdate = QDate.fromString(date_of_birth, 'dd.MM.yyyy')
 
-        return any([national_id, first_name, last_name]) or date_of_birth_qdate != current_date
+        return any([national_id, first_name, last_name]) or date_changed
 
     def __click_cancel_button(self):
         """
         Calls automatically when the user clicks on Cancel button.
         """
+
         self.close()
 
     def __click_ok_button(self):
         """
         Calls automatically when the user clicks on OK button.
         """
+
         # Delete previous search result if available
         self.__search_results_edit.clear()
         self.__search_results_edit.setStyleSheet("color: gray;")
@@ -195,9 +210,10 @@ class FindUserWindow(QWidget):
         national_id = self.__national_id_edit.text()
         first_name = self.__first_name_edit.text()
         last_name = self.__last_name_edit.text()
-        date_of_birth = self.__date_of_birth_edit.date().toString("dd.MM.yyyy")
+        date_of_birth = self.__date_of_birth_edit.date().toString("dd.MM.yyyy") if self.__date_of_birth_changed else \
+            None
 
-        if not self.__are_required_fields_filled(national_id, first_name, last_name, date_of_birth):
+        if not self.__are_required_fields_filled(national_id, first_name, last_name, self.__date_of_birth_changed):
             self.__missing_data_message()
             return
 
@@ -222,64 +238,63 @@ class FindUserWindow(QWidget):
         :return: True if the server responds with "search_successful", False otherwise.
         :rtype: bool
         """
+
         try:
-            # Create a socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                # Connect to the server
-                client_socket.connect((self.host, self.port))
+            header_data = {
+                "Content-Type": "application/json",
+                "Encoding": "utf-8"
+            }
 
-                header_data = {
-                    "Content-Type": "application/json",
-                    "Encoding": "utf-8"
-                }
+            request_data = {
+                "command": "find_user",
+                "national_id": national_id,
+                "first_name": first_name,
+                "last_name": last_name,
+            }
 
-                request_data = {
-                    "command": "find_user",
-                    "national_id": national_id,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "date_of_birth": date_of_birth
-                }
+            # Add date_of_birth to the request only if it has been changed
+            if date_of_birth is not None:
+                request_data["date_of_birth"] = date_of_birth
 
-                # Combine header and request data into a single dictionary
-                message = {
-                    "header": header_data,
-                    "request": request_data
-                }
+            # Combine header and request data into a single dictionary
+            message = {
+                "header": header_data,
+                "request": request_data
+            }
 
-                # Serialize the combined dictionary into JSON format
-                message_json = json.dumps(message)
+            # Serialize the combined dictionary into JSON format
+            message_json = json.dumps(message)
 
-                # Define a delimiter to mark the end of the message
-                delimiter = b'\r\n'
+            # Define a delimiter to mark the end of the message
+            delimiter = b'\r\n'
 
-                # Append the delimiter to the serialized message
-                message_json_with_delimiter = message_json.encode() + delimiter
+            # Append the delimiter to the serialized message
+            request = message_json.encode() + delimiter
 
-                # Send the JSON-formatted message over the socket
-                client_socket.sendall(message_json_with_delimiter)
+            response = self.tcp_client.send_request(request)
+            self.__client_logger.log_debug(f"TMS server response is {response}")
 
-                response = client_socket.recv(1024).decode()
-                response_json = json.loads(response)
+            # Parse the JSON response
+            response_data = json.loads(response['response'])
 
-                if response_json["command"] == "search_successful":
-                    self.__search_successful_message()
-                    # Extract user information from the results
-                    limited_user_info = response_json.get("user_info")
-                    # Populate the search results
-                    self.__populate_search_results(limited_user_info)
-                    print("Search successful!")
-                    return True
-                elif response_json["command"] == "search_unsuccessful":
-                    self.__search_unsuccessful_message()
-                    print("Search unsuccessful! :-(")
-                    return False
-                else:
-                    print("Server response error 2")
-                    return False
+            if response_data["command"] == "search_successful":
+                self.__search_successful_message()
+                # Extract user information from the results
+                limited_user_info = response_data.get("user_info")
+                # Populate the search results
+                self.__populate_search_results(limited_user_info)
+                self.__client_logger.log_debug(f"The search was successful!")
+                return True
+            elif response_data["command"] == "search_unsuccessful":
+                self.__search_unsuccessful_message()
+                self.__client_logger.log_debug(f"The search was unsuccessful!")
+                return False
+            else:
+                self.__client_logger.log_debug(f"Server response error")
+                return False
 
-        except Exception as e:
-            print("Error", e)
+        except Exception as exception:
+            self.__client_logger.log_error(f"Unexpected exception: {exception}")
             return False
 
     def __populate_search_results(self, results):
@@ -287,21 +302,26 @@ class FindUserWindow(QWidget):
         Populates the search results combo box with user information provided by the server or displays "No matching
         results" placeholder text if no results are found.
 
-        :param results: A list of dictionaries containing user information (national_id, first_name, last_name, date_of_birth).
+        :param results: A list of dictionaries containing user information (national_id, first_name, last_name,
+        date_of_birth).
         :type results: list of dict
         :return: None
         :rtype: None
         """
+
         self.__search_results_edit.clear()
         self.__search_results_edit.setStyleSheet("color: black;")
         if not results:
             self.__search_results_edit.setPlaceholderText("No matching results")
+            self.__client_logger.log_debug(f"No matching results")
+
         else:
             for result in results:
-                print("Result:", result)  # Debugging statement
+                self.__client_logger.log_debug(f"The search result: {result}")
                 display_text = (f"{result['national_id']} {result['first_name']} {result['last_name']} "
                                 f"{result['date_of_birth']}")
                 self.__search_results_edit.addItem(display_text)
+                self.__client_logger.log_debug(f"Preliminary results of the search displayed")
 
     def __handle_search_result_selected(self, index):
         """
@@ -312,6 +332,7 @@ class FindUserWindow(QWidget):
         :return: None
         :rtype: None
         """
+
         if index >= 0:
             # Get the selected item text
             selected_text = self.__search_results_edit.itemText(index)
@@ -324,8 +345,10 @@ class FindUserWindow(QWidget):
 
             # Send a request to the server to retrieve detailed information about the selected user
             self.__request_user_details(national_id)
+            self.__client_logger.log_debug(f"Request to the server to retrieve detailed information about a selected user"
+                                        f"is sent")
 
-    def __request_user_details(self, national_id):
+    def __request_user_details(self,  national_id):
         """
         Sends a request to the server to retrieve detailed information about a user identified by the provided national
         ID. Handles the server's response and emits signals to communicate the result.
@@ -333,96 +356,92 @@ class FindUserWindow(QWidget):
         :param national_id: The national ID of the user as an integer value.
         :type national_id: int
         """
+
         try:
-            # Create a socket
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-                # Connect to the server
-                client_socket.connect((self.host, self.port))
+            header_data = {
+                "Content-Type": "application/json",
+                "Encoding": "utf-8"
+            }
 
-                header_data = {
-                    "Content-Type": "application/json",
-                    "Encoding": "utf-8"
+            request_data = {
+                "command": "retrieve_user_details",
+                "national_id": national_id
+            }
+
+            # Combine header and request data into a single dictionary
+            message = {
+                "header": header_data,
+                "request": request_data
+            }
+
+            # Serialize the combined dictionary into JSON format
+            message_json = json.dumps(message)
+
+            # Define a delimiter to mark the end of the message
+            delimiter = b'\r\n'
+
+            # Append the delimiter to the serialized message
+            request = message_json.encode() + delimiter
+
+            response = self.tcp_client.send_request(request)
+            self.__client_logger.log_debug(f"TMS server response is {response}")
+
+            # Parse the JSON response
+            response_data = json.loads(response['response'])
+
+            if response_data["command"] == "retrieving_successful":
+
+                self.__retrieving_successful_message()
+                # Extract user information from the results
+                user_info = response_data["user_info"][0]
+                user_details = {
+                    "national_id": user_info.get("national_id"),
+                    "first_name": user_info.get("first_name"),
+                    "last_name": user_info.get("last_name"),
+                    "date_of_birth": user_info.get("date_of_birth"),
+                    "gender": user_info.get("gender"),
+                    "address_country": user_info.get("address_country"),
+                    "address_zip_code": user_info.get("address_zip_code"),
+                    "address_city": user_info.get("address_city"),
+                    "address_street": user_info.get("address_street"),
+                    "address_house_number": user_info.get("address_house_number"),
+                    "phone_country_code": user_info.get("phone_country_code"),
+                    "phone_number": user_info.get("phone_number"),
+                    "marital_status": user_info.get("marital_status"),
+                    "tax_rate": user_info.get("tax_rate"),
+                    "yearly_income": user_info.get("yearly_income"),
+                    "advance_tax": user_info.get("advance_tax"),
+                    "tax_paid_this_year": user_info.get("tax_paid_this_year"),
+                    "property_value": user_info.get("property_value"),
+                    "loans": user_info.get("loans"),
+                    "property_tax": user_info.get("property_tax")
                 }
+                self.__client_logger.log_debug(f"User details retrieved successfully")
+                if self.__main_window is not None:
+                    # Emit signal with user details
+                    self.__client_logger.log_debug(f"Emit user_details_retrieved_signal to send user details")
+                    self.__main_window.user_details_retrieved_signal.emit(user_details)
+                    self.close()
 
-                request_data = {
-                    "command": "retrieve_user_details",
-                    "national_id": national_id
-                }
+            elif response_data["command"] == "retrieving_unsuccessful":
+                self.__retrieving_unsuccessful_message()
+                self.__client_logger.log_debug(f"Retrieving of user details was unsuccessful!")
+                return False
 
-                # Combine header and request data into a single dictionary
-                message = {
-                    "header": header_data,
-                    "request": request_data
-                }
+            else:
+                self.__client_logger.log_debug(f"Server response error")
+                return False
 
-                # Serialize the combined dictionary into JSON format
-                message_json = json.dumps(message)
+        except (ConnectionError, TimeoutError, socket.error) as error:
+            self.__client_logger.log_error(f"Error during socket communication: {error}")
 
-                # Define a delimiter to mark the end of the message
-                delimiter = b'\r\n'
-
-                # Append the delimiter to the serialized message
-                message_json_with_delimiter = message_json.encode() + delimiter
-
-                # Send the JSON-formatted message over the socket
-                client_socket.sendall(message_json_with_delimiter)
-
-                response = client_socket.recv(1024).decode()
-                print("Response message received from server:", response)
-
-                response_json = json.loads(response)
-
-                if response_json["command"] == "retrieving_successful":
-
-                    self.__retrieving_successful_message()
-                    # Extract user information from the results
-                    user_info = response_json.get("user_info")[0]
-                    user_details = {
-                        "national_id": user_info.get("national_id"),
-                        "first_name": user_info.get("first_name"),
-                        "last_name": user_info.get("last_name"),
-                        "date_of_birth": user_info.get("date_of_birth"),
-                        "gender": user_info.get("gender"),
-                        "address_country": user_info.get("address_country"),
-                        "address_zip_code": user_info.get("address_zip_code"),
-                        "address_city": user_info.get("address_city"),
-                        "address_street": user_info.get("address_street"),
-                        "address_house_number": user_info.get("address_house_number"),
-                        "phone_country_code": user_info.get("phone_country_code"),
-                        "phone_number": user_info.get("phone_number"),
-                        "marital_status": user_info.get("marital_status"),
-                        "tax_rate": user_info.get("tax_rate"),
-                        "yearly_income": user_info.get("yearly_income"),
-                        "advance_tax": user_info.get("advance_tax"),
-                        "tax_paid_this_year": user_info.get("tax_paid_this_year"),
-                        "property_value": user_info.get("property_value"),
-                        "loans": user_info.get("loans"),
-                        "property_tax": user_info.get("property_tax")
-                    }
-                    if self.__main_window is not None:
-                        # Emit signal with user details
-                        print("Emit user_details_retrieved_signal to send user details")
-                        self.__main_window.user_details_retrieved_signal.emit(user_details)
-                        self.close()
-
-                elif response_json["command"] == "retrieving_unsuccessful":
-                    self.__retrieving_unsuccessful_message()
-                    print("Retrieving unsuccessful! :-(")
-                    return False
-
-                else:
-                    print("Server response error 3")
-                    return False
-
-        except (ConnectionError, TimeoutError, socket.error) as e:
-            print("Error during socket communication:", e)
-
-        except Exception as e:
-            print("Unexpected error:", e)
+        except Exception as exception:
+            self.__client_logger.log_error(f"Unexpected exception: {exception}")
 
         finally:
             # Emit signal to indicate request completion even if there was an error
             self.request_complete.emit()
+            self.__client_logger.log_debug(f"Request complete signal emitted")
             self.close()
 
     def __get_selected_user_info(self):
@@ -430,6 +449,7 @@ class FindUserWindow(QWidget):
         Retrieves national ID from the selected text in the combo box and sends it to the server to request detailed
         information about the selected user.
         """
+
         # Get the selected text from the combo box
         selected_text = self.__search_results_edit.currentText()
 
@@ -476,6 +496,7 @@ class FindUserWindow(QWidget):
         """
         Displays a confirmation message in case of a successful search.
         """
+
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Search successful")
         confirmation_dialog.setText("Here is a result of the search!")
@@ -485,6 +506,7 @@ class FindUserWindow(QWidget):
         """
         Displays a confirmation message in case of successful data retrieval.
         """
+
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Retrieving successful")
         confirmation_dialog.setText("Here is a result of the retrieving!")
@@ -503,10 +525,16 @@ class FindUserWindow(QWidget):
 
 
 if __name__ == "__main__":
+
+    client_logger = TMSLogger("client")
+    if not client_logger.setup():
+        sys.exit(1)
+
+    client_logger.log_debug("Client logger has been set up successfully")
     application = QApplication(sys.argv)
     host = "127.0.0.1"
     port = 65432
     # Create an instance of FindUserWindow
-    find_user_window = FindUserWindow(host, port, None)
+    find_user_window = FindUserWindow(client_logger, host, port, main_window=None)
     find_user_window.show()
     application.exec()
