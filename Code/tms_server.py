@@ -1,11 +1,14 @@
-from database import DatabaseServices
+from Code.database.database import DatabaseServices
 import socket
 import json
 import datetime
 import sys
+import threading
+import time
 from Code.utils import tms_logs
 
 db_services = DatabaseServices("taxpayers.db")
+db_lock = threading.Lock()
 
 
 class TCPServer:
@@ -97,94 +100,152 @@ class TCPServer:
             message_data = self.recv_until(client_socket_, b'\r\n').decode().strip()
             server_logger.log_debug(f"Received message: {message_data}")
 
+            ###
+            # Simulate slow processing by decoding one byte per second
+            slow_data = b'This is a test string for slow decoding.'
+            decoded_data = b''
+            for byte in slow_data:
+                decoded_data += bytes([byte])
+                time.sleep(0.1)  # Sleep for 1 second per byte
+            server_logger.log_debug(f"Slowly decoded data: {decoded_data}")
+            ###
+
             # Process the request
             request_data = json.loads(message_data)
             server_logger.log_debug(f"Parsed request data: {request_data}")
 
             command = request_data["request"].get("command")
 
-            if command == "login_request":
-                username = request_data["request"].get("username")
-                password = request_data["request"].get("password")
+            with db_lock:
+                if command == "login_request":
+                    username = request_data["request"].get("username")
+                    password = request_data["request"].get("password")
 
-                if not username or not password:
-                    response = "Username and password must be provided"
+                    if not username or not password:
+                        response = "Username and password must be provided"
+                        client_socket_.sendall(response.encode())
+                        server_logger.log_debug(f"Sent response: 'Username and password must be provided'")
+                        return
+
+                    result = db_services.check_credentials(username, password)
+                    if result:
+                        response = "User logged in successfully"
+                        client_socket_.sendall(response.encode())
+                        server_logger.log_debug(f"Sent response: 'User logged in successfully'")
+
+                    else:
+                        response = "Invalid username or password"
+                        client_socket_.sendall(response.encode())
+                        server_logger.log_debug(f"Sent response: 'Invalid username or password'")
+
+                if command == "save_new_user":
+                    national_id = request_data["request"].get("national_id")
+                    first_name = request_data["request"].get("first_name")
+                    last_name = request_data["request"].get("last_name")
+                    date_of_birth = request_data["request"].get("date_of_birth")
+                    gender = request_data["request"].get("gender")
+                    address_country = request_data["request"].get("address_country")
+                    address_zip_code = request_data["request"].get("address_zip_code")
+                    address_city = request_data["request"].get("address_city")
+                    address_street = request_data["request"].get("address_street")
+                    address_house_number = request_data["request"].get("address_house_number")
+                    phone_country_code = request_data["request"].get("phone_country_code")
+                    phone_number = request_data["request"].get("phone_number")
+                    marital_status = request_data["request"].get("marital_status")
+
+                    result = db_services.save_to_sql(national_id, first_name, last_name, date_of_birth, gender,
+                                                     address_country, address_zip_code, address_city, address_street,
+                                                     address_house_number, phone_country_code, phone_number, marital_status)
+                    response = "New user saved successfully"
                     client_socket_.sendall(response.encode())
-                    server_logger.log_debug(f"Sent response: 'Username and password must be provided'")
-                    return
 
-                result = db_services.check_credentials(username, password)
-                if result:
-                    response = "User logged in successfully"
-                    client_socket_.sendall(response.encode())
-                    server_logger.log_debug(f"Sent response: 'User logged in successfully'")
+                if command == "find_user":
+                    national_id = request_data["request"].get("national_id")
+                    first_name = request_data["request"].get("first_name")
+                    last_name = request_data["request"].get("last_name")
+                    date_of_birth = request_data["request"].get("date_of_birth")
 
-                else:
-                    response = "Invalid username or password"
-                    client_socket_.sendall(response.encode())
-                    server_logger.log_debug(f"Sent response: 'Invalid username or password'")
+                    # Initialize formatted_date_of_birth to None
+                    formatted_date_of_birth = None
 
+                    # Reformat the date_of_birth to the SQL format (YYYY-MM-DD) if it's not None
+                    if date_of_birth is not None:
+                        formatted_date_of_birth = datetime.datetime.strptime(date_of_birth, "%d.%m.%Y").strftime("%Y-%m-%d")
 
-            if command == "save_new_user":
-                national_id = request_data["request"].get("national_id")
-                first_name = request_data["request"].get("first_name")
-                last_name = request_data["request"].get("last_name")
-                date_of_birth = request_data["request"].get("date_of_birth")
-                gender = request_data["request"].get("gender")
-                address_country = request_data["request"].get("address_country")
-                address_zip_code = request_data["request"].get("address_zip_code")
-                address_city = request_data["request"].get("address_city")
-                address_street = request_data["request"].get("address_street")
-                address_house_number = request_data["request"].get("address_house_number")
-                phone_country_code = request_data["request"].get("phone_country_code")
-                phone_number = request_data["request"].get("phone_number")
-                marital_status = request_data["request"].get("marital_status")
+                    search_results = db_services.search_personal_info(national_id, first_name, last_name,
+                                                                      formatted_date_of_birth)
+                    if search_results is None or len(search_results) == 0:
+                        response_data = {"command": "search_unsuccessful"}
+                        # Convert the response data to a JSON string
+                        response_message = json.dumps(response_data) + "\r\n"
 
-                result = db_services.save_to_sql(national_id, first_name, last_name, date_of_birth, gender,
-                                                 address_country, address_zip_code, address_city, address_street,
-                                                 address_house_number, phone_country_code, phone_number, marital_status)
-                response = "New user saved successfully"
-                client_socket_.sendall(response.encode())
+                        # Send the response message to the client
+                        client_socket_.sendall(response_message.encode())
+                    else:
+                        for user in search_results:
+                            limited_user_info = {
+                                "national_id": user[0],
+                                "first_name": user[1],
+                                "last_name": user[2],
+                                "date_of_birth": user[3]
+                            }
+                            # Append user details to the list
+                            user_info_list.append(limited_user_info)
+                            server_logger.log_debug(f"Result: {user_info_list}")
 
-            if command == "find_user":
-                national_id = request_data["request"].get("national_id")
-                first_name = request_data["request"].get("first_name")
-                last_name = request_data["request"].get("last_name")
-                date_of_birth = request_data["request"].get("date_of_birth")
-
-                # Initialize formatted_date_of_birth to None
-                formatted_date_of_birth = None
-
-                # Reformat the date_of_birth to the SQL format (YYYY-MM-DD) if it's not None
-                if date_of_birth is not None:
-                    formatted_date_of_birth = datetime.datetime.strptime(date_of_birth, "%d.%m.%Y").strftime("%Y-%m-%d")
-
-                search_results = db_services.search_personal_info(national_id, first_name, last_name,
-                                                                  formatted_date_of_birth)
-                if search_results is None or len(search_results) == 0:
-                    response_data = {"command": "search_unsuccessful"}
-                    # Convert the response data to a JSON string
-                    response_message = json.dumps(response_data) + "\r\n"
-
-                    # Send the response message to the client
-                    client_socket_.sendall(response_message.encode())
-                else:
-                    for user in search_results:
-                        limited_user_info = {
-                            "national_id": user[0],
-                            "first_name": user[1],
-                            "last_name": user[2],
-                            "date_of_birth": user[3]
+                        # Create the response message
+                        response_data = {
+                            "command": "search_successful",
+                            "user_info": user_info_list
                         }
-                        # Append user details to the list
-                        user_info_list.append(limited_user_info)
-                        server_logger.log_debug(f"Result: {user_info_list}")
 
-                    # Create the response message
-                    response_data = {
-                        "command": "search_successful",
-                        "user_info": user_info_list
-                    }
+                        server_logger.log_debug(f"Response message sent to client: {response_data}")
+
+                        # Convert the response data to a JSON string
+                        response_message = json.dumps(response_data) + "\r\n"
+
+                        # Send the response message to the client
+                        client_socket_.sendall(response_message.encode())
+
+                elif command == "retrieve_user_details":
+                    national_id = request_data["request"].get("national_id")
+
+                    search_results = db_services.retrieve_user_details(national_id)
+                    if search_results is None:
+                        response_data = {"command": "retrieving_unsuccessful"}
+
+                    else:
+                        complete_user_info_list = []
+                        for user_info in search_results:
+                            complete_user_info = {
+                                "national_id": user_info[0],
+                                "first_name": user_info[1],
+                                "last_name": user_info[2],
+                                "date_of_birth": user_info[3],
+                                "gender": user_info[4],
+                                "address_country": user_info[6],
+                                "address_zip_code": user_info[7],
+                                "address_city": user_info[8],
+                                "address_street": user_info[9],
+                                "address_house_number": user_info[10],
+                                "phone_country_code": user_info[11],
+                                "phone_number": user_info[12],
+                                "marital_status": user_info[14],
+                                "tax_rate": user_info[15],
+                                "yearly_income": user_info[16],
+                                "advance_tax": user_info[17],
+                                "tax_paid_this_year": user_info[18],
+                                "property_value": user_info[19],
+                                "loans": user_info[20],
+                                "property_tax": user_info[21],
+                            }
+                            complete_user_info_list.append(complete_user_info)
+                            server_logger.log_debug(f"Complete_user_info_list: {complete_user_info_list}")
+
+                        response_data = {
+                            "command": "retrieving_successful",
+                            "user_info": complete_user_info_list
+                        }
 
                     server_logger.log_debug(f"Response message sent to client: {response_data}")
 
@@ -193,54 +254,6 @@ class TCPServer:
 
                     # Send the response message to the client
                     client_socket_.sendall(response_message.encode())
-
-            if command == "retrieve_user_details":
-                national_id = request_data["request"].get("national_id")
-
-                search_results = db_services.retrieve_user_details(national_id)
-                if search_results is None:
-                    response_data = {"command": "retrieving_unsuccessful"}
-
-                else:
-                    complete_user_info_list = []
-                    for user_info in search_results:
-                        complete_user_info = {
-                            "national_id": user_info[0],
-                            "first_name": user_info[1],
-                            "last_name": user_info[2],
-                            "date_of_birth": user_info[3],
-                            "gender": user_info[4],
-                            "address_country": user_info[6],
-                            "address_zip_code": user_info[7],
-                            "address_city": user_info[8],
-                            "address_street": user_info[9],
-                            "address_house_number": user_info[10],
-                            "phone_country_code": user_info[11],
-                            "phone_number": user_info[12],
-                            "marital_status": user_info[14],
-                            "tax_rate": user_info[15],
-                            "yearly_income": user_info[16],
-                            "advance_tax": user_info[17],
-                            "tax_paid_this_year": user_info[18],
-                            "property_value": user_info[19],
-                            "loans": user_info[20],
-                            "property_tax": user_info[21],
-                        }
-                        complete_user_info_list.append(complete_user_info)
-                        server_logger.log_debug(f"Complete_user_info_list: {complete_user_info_list}")
-
-                    response_data = {
-                        "command": "retrieving_successful",
-                        "user_info": complete_user_info_list
-                    }
-
-                server_logger.log_debug(f"Response message sent to client: {response_data}")
-
-                # Convert the response data to a JSON string
-                response_message = json.dumps(response_data) + "\r\n"
-
-                # Send the response message to the client
-                client_socket_.sendall(response_message.encode())
 
         except Exception as exception:
             server_logger.log_error(f"Unexpected exception: {exception}")
@@ -260,5 +273,6 @@ if __name__ == '__main__':
     while True:
         client_socket, client_address = server.server_socket.accept()
         server_logger.log_debug(f"Connected client: {client_address}")
-        server.handle_request(client_socket)
+        multiple_client_connection_thread = threading.Thread(target=server.handle_request, args=(client_socket,))
+        multiple_client_connection_thread.start()
     sys.exit(0)
