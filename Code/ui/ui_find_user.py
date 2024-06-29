@@ -1,10 +1,11 @@
 import sys
 import socket
 import json
+import threading
+import Code.tcp_ip.tcp_driver as tcp_driver
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QVBoxLayout, QHBoxLayout,
                              QDateEdit, QMessageBox, QComboBox, QSpinBox)
-from PyQt6.QtCore import QDate, pyqtSignal
-import Code.tcp_ip.tcp_driver as tcp_driver
+from PyQt6.QtCore import QDate, pyqtSignal, QTimer
 from Code.utils.tms_logs import TMSLogger
 
 
@@ -19,8 +20,21 @@ class FindUserWindow(QWidget):
         __main_layout (QVBoxLayout): A layout widget for organizing GUI components.
     """
 
-    # Define the user_saved signal
+    # User saved signal
     request_complete = pyqtSignal()
+    # Search successful signal
+    search_successful_signal = pyqtSignal()
+    # Search unsuccessful signal
+    search_unsuccessful_signal = pyqtSignal()
+    # Retrieving successful signal
+    retrieving_successful_signal = pyqtSignal()
+    # Retrieving unsuccessful signal
+    retrieving_unsuccessful_signal = pyqtSignal()
+    # Define a signal for handling server timeout
+    server_timeout_signal = pyqtSignal()
+
+    start_timer_signal = pyqtSignal(int)
+    stop_timer_signal = pyqtSignal()
 
     def __init__(self, client_logger: TMSLogger, host, port, main_window):
         """
@@ -32,7 +46,6 @@ class FindUserWindow(QWidget):
             port (int): The port used by the server to connect to.
             main_window (TMSMainWindow): An instance of the TMSMainWindow class.
         """
-
         super().__init__()
         self.__client_logger = client_logger
         self.host = host
@@ -46,10 +59,26 @@ class FindUserWindow(QWidget):
         # Call PyQt6 API to create a layout where all UI components are placed.
         self.setMinimumWidth(500)
         self.__main_layout = QVBoxLayout()
-        # Create all UI components on layout.
-        self.__init_ui()
         # Call PyQt6 API to set prepared layout with all UI components.
         self.setLayout(self.__main_layout)
+        self.__thread_event = threading.Event()
+
+        self.running = False
+        self.__init_ui()
+
+        # Connect the signals to the messages
+        self.search_successful_signal.connect(self.__search_successful_message)
+        self.search_unsuccessful_signal.connect(self.__search_unsuccessful_message)
+        self.retrieving_successful_signal.connect(self.handle_retrieving_successful)
+        self.retrieving_unsuccessful_signal.connect(self.handle_retrieving_unsuccessful)
+
+        self.__timer = QTimer()
+        self.__timer.timeout.connect(self.__handle_timeout)
+        self.start_timer_signal.connect(self.__start_timer)
+        self.stop_timer_signal.connect(self.__stop_timer)
+        # Connect the search results combo box signal to the handler
+        self.__search_results_edit.currentIndexChanged.connect(self.__handle_search_result_selected)
+
 
     def __init_ui(self):
         """
@@ -108,10 +137,6 @@ class FindUserWindow(QWidget):
         self.__search_results_edit.setPlaceholderText("Search results")
         self.__set_widget_color(self.__search_results_edit, "gray")
         self.__search_results_edit.currentIndexChanged.connect(self.__handle_widget_edit)
-        # Connect the activated signal to the method that retrieves user information
-        self.__search_results_edit.activated.connect(self.__get_selected_user_info)
-        user_list = []
-        self.__search_results_edit.addItems(user_list)
 
         # Create a horizontal layout for the labels and widgets
         self.__main_layout.addWidget(self.__label1)
@@ -149,6 +174,22 @@ class FindUserWindow(QWidget):
         self.__main_layout.addLayout(button_layout)
 
         self.__client_logger.log_debug("Find User Window has been initialized successfully")
+
+    def __start_timer(self, timeout):
+        """
+        Starts a timer for the specified timeout duration.
+        Args:
+            timeout (int): The timeout duration in seconds.
+        """
+        self.__client_logger.log_debug("Starting timer")
+        self.__timer.start(timeout * 1000)  # Milliseconds
+
+    def __stop_timer(self):
+        """
+        Stops the currently running timer.
+        """
+        self.__client_logger.log_debug("Stopping timer")
+        self.__timer.stop()
 
     def __handle_widget_edit(self):
         """
@@ -202,12 +243,13 @@ class FindUserWindow(QWidget):
         """
         Calls automatically when the user clicks on OK button.
         """
-
         # Delete previous search result if available
         self.__search_results_edit.clear()
         self.__search_results_edit.setStyleSheet("color: gray;")
         # Collect data from all widgets
         national_id = self.__national_id_edit.text()
+        if national_id:
+            national_id = int(national_id)  # Convert to int if not empty
         first_name = self.__first_name_edit.text()
         last_name = self.__last_name_edit.text()
         date_of_birth = self.__date_of_birth_edit.date().toString("dd.MM.yyyy") if self.__date_of_birth_changed else \
@@ -217,9 +259,28 @@ class FindUserWindow(QWidget):
             self.__missing_data_message()
             return
 
-        else:
-            # Call the function to send a search request to the server
-            self.__send_search_request(national_id, first_name, last_name, date_of_birth)
+        self.running = True  # Reset the running flag
+        self.__thread_event.clear()  # Clear the event
+
+        # Perform the actual search request in a separate thread
+        threading.Thread(target=self.__send_search_request,
+                         args=(national_id, first_name, last_name, date_of_birth)).start()
+        self.__client_logger.log_debug("Search request thread started")
+
+    def __handle_timeout(self):
+        """
+        Handles the timeout event when a search request exceeds the specified duration.
+        """
+        self.__client_logger.log_debug("Search request timed out")
+        self.__stop_timer()
+        self.running = False  # Reset the running flag
+        self.__thread_event.set()  # Ensure the thread is signaled to stop
+        self.__stop_timer()
+        # Emit server timeout signal
+        self.server_timeout_signal.emit()
+        self.__client_logger.log_debug("Timeout handled and signal emitted")
+
+        self.__server_timeout_message()
 
     def __send_search_request(self, national_id, first_name, last_name, date_of_birth):
         """
@@ -239,7 +300,14 @@ class FindUserWindow(QWidget):
         :rtype: bool
         """
 
+        self.__client_logger.log_debug("Search request thread started execution")
         try:
+            timeout = 5  # seconds
+
+            self.__client_logger.log_debug("Search request timeout started")
+            self.start_timer_signal.emit(timeout)
+
+            self.__client_logger.log_debug("Started sending search request")
             header_data = {
                 "Content-Type": "application/json",
                 "Encoding": "utf-8"
@@ -271,31 +339,47 @@ class FindUserWindow(QWidget):
             # Append the delimiter to the serialized message
             request = message_json.encode() + delimiter
 
-            response = self.tcp_client.send_request(request)
-            self.__client_logger.log_debug(f"TMS server response is {response}")
+            while self.running:
+                response = self.tcp_client.send_request(request)
+                if not self.running:
+                    self.__client_logger.log_debug("Search request was stopped")
+                    return False
 
-            # Parse the JSON response
-            response_data = json.loads(response['response'])
+                self.__client_logger.log_debug(f"TMS server response is {response}")
 
-            if response_data["command"] == "search_successful":
-                self.__search_successful_message()
-                # Extract user information from the results
-                limited_user_info = response_data.get("user_info")
-                # Populate the search results
-                self.__populate_search_results(limited_user_info)
-                self.__client_logger.log_debug(f"The search was successful!")
-                return True
-            elif response_data["command"] == "search_unsuccessful":
-                self.__search_unsuccessful_message()
-                self.__client_logger.log_debug(f"The search was unsuccessful!")
-                return False
-            else:
-                self.__client_logger.log_debug(f"Server response error")
-                return False
+                response_data = json.loads(response['response'])
+
+                if response_data["command"] == "search_successful":
+                    self.search_successful_signal.emit()
+                    limited_user_info = response_data.get("user_info")
+                    self.__populate_search_results(limited_user_info)
+                    self.__client_logger.log_debug(f"The search was successful!")
+                    return True
+                elif response_data["command"] == "search_unsuccessful":
+                    self.search_unsuccessful_signal.emit()
+                    self.__client_logger.log_debug(f"The search was unsuccessful!")
+                    return False
+                else:
+                    self.__client_logger.log_debug(f"Server response error")
+                    return False
 
         except Exception as exception:
             self.__client_logger.log_error(f"Unexpected exception: {exception}")
             return False
+
+        finally:
+            self.running = False
+            self.__client_logger.log_debug("Search request thread finished")
+            self.stop_timer_signal.emit()
+
+    def extract_national_id(self, selected_text):
+        """
+        Extracts the national ID from the selected search result text.
+        # """
+        # Split the text and assume the national_id is the first part
+        parts = selected_text.split()
+        national_id = parts[0]  # Extract the first part which is the national ID
+        return national_id
 
     def __populate_search_results(self, results):
         """
@@ -341,12 +425,10 @@ class FindUserWindow(QWidget):
             selected_info = selected_text.split()
 
             # Extract the national ID from the selected information
-            national_id = selected_info[0]
+            national_id = str(selected_info[0])
 
-            # Send a request to the server to retrieve detailed information about the selected user
-            self.__request_user_details(national_id)
-            self.__client_logger.log_debug(f"Request to the server to retrieve detailed information about a selected user"
-                                        f"is sent")
+            # Start a new thread to handle the request
+            threading.Thread(target=self.__request_user_details, args=(national_id,)).start()
 
     def __request_user_details(self,  national_id):
         """
@@ -357,7 +439,15 @@ class FindUserWindow(QWidget):
         :type national_id: int
         """
 
+        self.__client_logger.log_debug("User details request thread started execution")
         try:
+            timeout = 5  # seconds
+
+            self.__timer.setSingleShot(True)
+            self.__client_logger.log_debug("User info request timeout started")
+            self.start_timer_signal.emit(timeout)
+
+            self.__client_logger.log_debug("Entered __request_user_details method")
             header_data = {
                 "Content-Type": "application/json",
                 "Encoding": "utf-8"
@@ -383,16 +473,24 @@ class FindUserWindow(QWidget):
             # Append the delimiter to the serialized message
             request = message_json.encode() + delimiter
 
-            response = self.tcp_client.send_request(request)
+            try:
+                response = self.tcp_client.send_request(request)
+            except socket.timeout:
+                self.__client_logger.log_error("Request to TMS server timed out")
+                self.retrieving_unsuccessful_signal.emit()  # Emit signal for unsuccessful retrieval
+                self.running = False  # Reset the running flag
+                return
+
             self.__client_logger.log_debug(f"TMS server response is {response}")
+            self.stop_timer_signal.emit()
+
+            response = self.tcp_client.send_request(request)
 
             # Parse the JSON response
             response_data = json.loads(response['response'])
 
             if response_data["command"] == "retrieving_successful":
-
-                self.__retrieving_successful_message()
-                # Extract user information from the results
+                self.__client_logger.log_debug("User details retrieved successfully")
                 user_info = response_data["user_info"][0]
                 user_details = {
                     "national_id": user_info.get("national_id"),
@@ -416,48 +514,64 @@ class FindUserWindow(QWidget):
                     "loans": user_info.get("loans"),
                     "property_tax": user_info.get("property_tax")
                 }
-                self.__client_logger.log_debug(f"User details retrieved successfully")
-                if self.__main_window is not None:
-                    # Emit signal with user details
-                    self.__client_logger.log_debug(f"Emit user_details_retrieved_signal to send user details")
+                self.__client_logger.log_debug("Emit user_details_retrieved_signal to send user details")
+                try:
                     self.__main_window.user_details_retrieved_signal.emit(user_details)
-                    self.close()
-
+                    self.retrieving_successful_signal.emit()  # Emit signal for successful retrieval
+                except Exception as exception:
+                    self.__client_logger.log_error(f"Error emitting user_details_retrieved_signal: {exception}")
             elif response_data["command"] == "retrieving_unsuccessful":
-                self.__retrieving_unsuccessful_message()
-                self.__client_logger.log_debug(f"Retrieving of user details was unsuccessful!")
-                return False
-
+                self.__client_logger.log_debug("Retrieving of user details was unsuccessful!")
+                self.retrieving_unsuccessful_signal.emit()
             else:
-                self.__client_logger.log_debug(f"Server response error")
-                return False
+                self.__client_logger.log_debug("Server response error")
+                self.retrieving_unsuccessful_signal.emit()
 
         except (ConnectionError, TimeoutError, socket.error) as error:
             self.__client_logger.log_error(f"Error during socket communication: {error}")
+            self.retrieving_unsuccessful_signal.emit()
 
         except Exception as exception:
             self.__client_logger.log_error(f"Unexpected exception: {exception}")
+            self.retrieving_unsuccessful_signal.emit()
 
         finally:
-            # Emit signal to indicate request completion even if there was an error
+            self.running = False
+            self.__client_logger.log_debug("User details request thread finished")
+
+    def handle_retrieving_successful(self):
+        """
+        Handles the successful retrieval of user details.
+
+        Emits the request_complete signal and logs the event. Resets the running flag,
+        signals thread completion, closes connections, and logs method exit.
+        """
+        try:
             self.request_complete.emit()
-            self.__client_logger.log_debug(f"Request complete signal emitted")
-            self.close()
+            self.__client_logger.log_debug("Request complete signal emitted")
+        except Exception as exception:
+            self.__client_logger.log_error(f"Error emitting request_complete signal:  {exception}")
+        self.__thread_event.set()  # Signal that the thread has completed
+        self.running = False  # Reset the running flag
+        self.close()
+        self.__client_logger.log_debug("Exiting __request_user_details method")
 
-    def __get_selected_user_info(self):
+    def handle_retrieving_unsuccessful(self):
         """
-        Retrieves national ID from the selected text in the combo box and sends it to the server to request detailed
-        information about the selected user.
+        Handles the unsuccessful retrieval of user details.
+
+        Emits the request_complete signal due to unsuccessful retrieval and logs the event.
+        Resets the running flag, signals thread completion, closes connections, and logs method exit.
         """
-
-        # Get the selected text from the combo box
-        selected_text = self.__search_results_edit.currentText()
-
-        # Extract the national ID from the selected information
-        national_id = selected_text.split()[0]
-
-        # Send a request to the server to retrieve detailed information about the selected user
-        self.__request_user_details(national_id)
+        try:
+            self.request_complete.emit()
+            self.__client_logger.log_debug("Request complete signal emitted due to unsuccessful retrieval")
+        except Exception as exception:
+            self.__client_logger.log_error(f"Error emitting request_complete signal: {exception}")
+        self.__thread_event.set()  # Signal that the thread has completed
+        self.running = False  # Reset the running flag
+        self.close()
+        self.__client_logger.log_debug("Exiting __request_user_details method")
 
     def __missing_data_message(self):
         """
@@ -500,7 +614,7 @@ class FindUserWindow(QWidget):
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Search successful")
         confirmation_dialog.setText("Here is a result of the search!")
-        confirmation_dialog.exec()
+        confirmation_dialog.open()
 
     def __retrieving_successful_message(self):
         """
@@ -510,7 +624,7 @@ class FindUserWindow(QWidget):
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setWindowTitle("Retrieving successful")
         confirmation_dialog.setText("Here is a result of the retrieving!")
-        confirmation_dialog.exec()
+        confirmation_dialog.open()
 
     def __retrieving_unsuccessful_message(self):
         """
@@ -521,6 +635,17 @@ class FindUserWindow(QWidget):
         warning_dialog.setIcon(QMessageBox.Icon.Warning)
         warning_dialog.setWindowTitle("Retrieving unsuccessful")
         warning_dialog.setText("No data was wound!")
+        warning_dialog.exec()
+
+    def __server_timeout_message(self):
+        """
+        Displays a warning message in case of server timeout.
+        """
+
+        warning_dialog = QMessageBox(self)
+        warning_dialog.setIcon(QMessageBox.Icon.Warning)
+        warning_dialog.setWindowTitle("Server timeout")
+        warning_dialog.setText("No response from the server!")
         warning_dialog.exec()
 
 
@@ -537,4 +662,9 @@ if __name__ == "__main__":
     # Create an instance of FindUserWindow
     find_user_window = FindUserWindow(client_logger, host, port, main_window=None)
     find_user_window.show()
-    application.exec()
+    try:
+        application.exec()
+    except Exception as exception:
+        client_logger.log_error(f"Unhandled exception: {exception}")  # Changed line
+    finally:
+        client_logger.log_debug("Application exited")  # Changed line

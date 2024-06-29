@@ -270,14 +270,7 @@ if __name__ == "__main__":
     username = None
     password = None
 
-    # try:
-        # username = sys.argv[1]
-        # password = sys.argv[2]
     main_window = TMSMainWindow(client_logger, username, password, host, port)
-
-    # except IndexError as error:
-    #     client_logger.log_error(f"Unexpected error: {error}")
-    #     main_window = TMSMainWindow(client_logger, None, None, host, port)
 
     main_window.show()
     sys.exit(app.exec())

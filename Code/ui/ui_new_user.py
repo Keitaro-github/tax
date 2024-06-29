@@ -1,11 +1,12 @@
 import sys
+import json
+import threading
+import Code.tcp_ip.tcp_driver as tcp_driver
 from PyQt6.QtWidgets import (QWidget, QApplication, QPushButton, QLineEdit, QLabel, QVBoxLayout, QHBoxLayout,
                              QRadioButton, QButtonGroup, QDateEdit, QMessageBox, QComboBox, QSpinBox)
 from PyQt6.QtGui import QRegularExpressionValidator
 from PyQt6.QtCore import QRegularExpression, pyqtSignal
-import Code.tcp_ip.tcp_driver as tcp_driver
 from Code.utils.tms_logs import TMSLogger
-import json
 
 
 class NewUserWindow(QWidget):
@@ -331,10 +332,18 @@ class NewUserWindow(QWidget):
             self.__unexpected_error_message()
             self.__client_logger.log_error(f"Unexpected error")
 
-        # Call the function to save new user with the collected data
-        self.save_new_user_request(national_id, first_name, last_name, date_of_birth, gender, address_country,
-                                   address_zip_code, address_city, address_street, address_house_number,
-                                   phone_country_code, phone_number, marital_status)
+        ###
+        (threading.Thread(target=self.save_new_user_request, args=(national_id, first_name, last_name, date_of_birth,
+                                                                   gender, address_country, address_zip_code,
+                                                                   address_city, address_street, address_house_number,
+                                                                   phone_country_code, phone_number,
+                                                                   marital_status)).start())
+        ###
+
+        # # Call the function to save new user with the collected data
+        # self.save_new_user_request(national_id, first_name, last_name, date_of_birth, gender, address_country,
+        #                            address_zip_code, address_city, address_street, address_house_number,
+        #                            phone_country_code, phone_number, marital_status)
 
     def save_new_user_request(self, national_id, first_name, last_name, date_of_birth, gender, address_country,
                               address_zip_code, address_city, address_street, address_house_number,

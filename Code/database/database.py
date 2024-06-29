@@ -35,7 +35,7 @@ class DatabaseServices:
         # Get the absolute path to the directory containing the script
         script_dir = os.path.dirname(os.path.abspath(__file__))
         # Construct the absolute path to the database file using the script directory
-        db_path = os.path.join(script_dir, 'database', db_file)
+        db_path = os.path.join(script_dir, db_file)
         # Connect to the SQLite database
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
