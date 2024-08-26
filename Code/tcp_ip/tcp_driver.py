@@ -1,9 +1,28 @@
-import socket
+import os
+import sys
 import json
-import datetime
 import threading
+import socket
+import datetime
+
+
+# Function to get the correct path to resources
+def resource_path(relative_path):
+    """ Get the absolute path to a resource, works for both dev and PyInstaller environments """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+# Update the sys.path to include the correct module paths
+sys.path.append(resource_path('Code'))
+
 from Code.utils import tms_logs
 from Code.database.database import DatabaseServices
+
 
 TCP_ERROR_CODES = {
     "No error": 0,
@@ -11,8 +30,22 @@ TCP_ERROR_CODES = {
     "TCP Connection error": 2,
 }
 
-db_services = DatabaseServices("taxpayers.db")
+# Determine the base path based on the execution context
+if getattr(sys, 'frozen', False):
+    # If the application is run as a bundle (e.g., using cx_Freeze)
+    base_path = os.path.dirname(sys.executable)  # Path to the directory containing the executable
+else:
+    # If the application is run in a standard Python environment (e.g., PyCharm)
+    base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Construct the path to the SQLite database file
+db_path = os.path.join(base_path, 'database', 'taxpayers.db')
+
+# Initialize the DatabaseServices object
+database = DatabaseServices(db_path)
+
 db_lock = threading.Lock()
+
 
 class TCPClient:
     __instance = None
@@ -26,6 +59,7 @@ class TCPClient:
         self.tms_logger = tms_logger
         self.host = host
         self.port = port
+        self.__busy = False
         self.__busy = False
         self.__lock = threading.Lock()
 
@@ -46,13 +80,20 @@ class TCPClient:
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
                     client_socket.connect((self.host, self.port))
+
+                    # Ensure the request is a bytes-like object
+                    if isinstance(request, str):
+                        request = request.encode()
+
                     client_socket.sendall(request)
                     response = client_socket.recv(1024).decode().strip()
                     self.__busy = False
                     return {"error": TCP_ERROR_CODES["No error"], "response": response}
-            except socket.gaierror as error:
-                self.__busy = False
-                self.tms_logger.log_critical(f"Error occurred during establishing TCP socket connection: {error}")
+            except socket.timeout as error:
+                self.tms_logger.log_critical(f"Timeout occurred during TCP socket connection: {error}")
+                return {"error": TCP_ERROR_CODES["TCP Connection error"], "response": None}
+            except socket.error as error:
+                self.tms_logger.log_critical(f"Socket error occurred: {error}")
                 return {"error": TCP_ERROR_CODES["TCP Connection error"], "response": None}
 
     def is_busy(self):
@@ -88,6 +129,7 @@ class TCPClient:
             self.host = address
             return True
         return False
+
 
 class TCPServer:
     def __init__(self, host, port, new_user_window_instance):
@@ -127,10 +169,12 @@ class TCPServer:
         Returns:
             dict: The parsed header data.
         """
-        return json.loads(header_data)
+        try:
+            return json.loads(header_data)
+        except json.JSONDecodeError as json_error:
+            raise ValueError(f"Invalid JSON format: {json_error}")
 
-    @staticmethod
-    def recv_until(client_socket_, delimiter):
+    def recv_until(self, client_socket_, delimiter):
         """
         Receives data from the client socket until the specified delimiter is encountered.
         Args:
@@ -139,12 +183,19 @@ class TCPServer:
         Returns:
             bytes: The received data.
         """
-        data = b''
-        while not data.endswith(delimiter):
-            chunk = client_socket_.recv(1024)
-            if not chunk:
-                break
-            data += chunk
+        try:
+            data = b''
+            while not data.endswith(delimiter):
+                chunk = client_socket_.recv(1024)
+                if not chunk:
+                    break
+                data += chunk
+                self.server_logger.log_debug(f"Received chunk: {chunk}")
+        except socket.error as error:
+            self.server_logger.log_error(f"Error receiving data: {error}")
+            raise  # Re-raise the exception for caller to handle it
+
+        self.server_logger.log_debug(f"Complete data received: {data}")
         return data
 
     def handle_request(self, client_socket_):
@@ -153,13 +204,24 @@ class TCPServer:
         Args:
             client_socket_ (socket.socket): The client socket.
         """
+        # time.sleep(3)  # Debug line
         user_info_list = []
         try:
             message_data = self.recv_until(client_socket_, b'\r\n').decode().strip()
             self.server_logger.log_debug(f"Received message: {message_data}")
-            request_data = json.loads(message_data)
+
+            try:
+                request_data = json.loads(message_data)
+            except json.JSONDecodeError as json_error:
+                self.server_logger.log_error(f"JSON parsing error: {json_error}")
+                response = "Invalid JSON format"
+                client_socket_.sendall(response.encode())
+                return
+
             self.server_logger.log_debug(f"Parsed request data: {request_data}")
             command = request_data["request"].get("command")
+            self.server_logger.log_debug(f"Command received: {command}")
+
             with db_lock:
                 if command == "login_request":
                     username = request_data["request"].get("username")
@@ -169,7 +231,15 @@ class TCPServer:
                         client_socket_.sendall(response.encode())
                         self.server_logger.log_debug("Sent response: 'Username and password must be provided'")
                         return
-                    result = db_services.check_credentials(username, password)
+
+                    try:
+                        result = database.check_credentials(username, password)
+                    except Exception as db_error:
+                        self.server_logger.log_error(f"Database error during login: {db_error}")
+                        response = "Server error during login"
+                        client_socket_.sendall(response.encode())
+                        return
+
                     if result:
                         response = "User logged in successfully"
                         client_socket_.sendall(response.encode())
@@ -192,11 +262,18 @@ class TCPServer:
                     phone_country_code = request_data["request"].get("phone_country_code")
                     phone_number = request_data["request"].get("phone_number")
                     marital_status = request_data["request"].get("marital_status")
-                    result = db_services.save_to_sql(national_id, first_name, last_name, date_of_birth, gender,
-                                                     address_country, address_zip_code, address_city, address_street,
-                                                     address_house_number, phone_country_code, phone_number, marital_status)
-                    response = "New user saved successfully"
-                    client_socket_.sendall(response.encode())
+
+                    database.save_to_sql(national_id, first_name, last_name, date_of_birth, gender, address_country,
+                                         address_zip_code, address_city, address_street, address_house_number,
+                                         phone_country_code, phone_number, marital_status)
+
+                    response = {
+                        "status": "success",
+                        "message": "New user saved successfully"
+                    }
+                    client_socket_.sendall(json.dumps(response).encode())
+
+                    self.server_logger.log_debug("Sent response: 'New user saved successfully'")
                 elif command == "find_user":
                     national_id = request_data["request"].get("national_id")
                     first_name = request_data["request"].get("first_name")
@@ -204,8 +281,11 @@ class TCPServer:
                     date_of_birth = request_data["request"].get("date_of_birth")
                     formatted_date_of_birth = None
                     if date_of_birth:
-                        formatted_date_of_birth = datetime.datetime.strptime(date_of_birth, "%d.%m.%Y").strftime("%Y-%m-%d")
-                    search_results = db_services.search_personal_info(national_id, first_name, last_name, formatted_date_of_birth)
+                        formatted_date_of_birth = datetime.datetime.strptime(date_of_birth,
+                                                                             "%d.%m.%Y").strftime("%Y-%m-%d")
+                    search_results = database.search_personal_info(national_id, first_name, last_name,
+                                                                   formatted_date_of_birth)
+                    self.server_logger.log_debug(f"Search results: {search_results}")
                     if not search_results:
                         response_data = {"command": "search_unsuccessful"}
                         response_message = json.dumps(response_data) + "\r\n"
@@ -226,7 +306,7 @@ class TCPServer:
                         client_socket_.sendall(response_message.encode())
                 elif command == "retrieve_user_details":
                     national_id = request_data["request"].get("national_id")
-                    search_results = db_services.retrieve_user_details(national_id)
+                    search_results = database.retrieve_user_details(national_id)
                     if not search_results:
                         response_data = {"command": "retrieving_unsuccessful"}
                     else:
@@ -260,7 +340,19 @@ class TCPServer:
                     self.server_logger.log_debug(f"Response message sent to client: {response_data}")
                     response_message = json.dumps(response_data) + "\r\n"
                     client_socket_.sendall(response_message.encode())
+                else:
+                    self.server_logger.log_error(f"Command '{command}' unknown")
+
+        except socket.error as socket_error:
+
+            self.server_logger.log_error(f"Socket error occurred while handling request: {socket_error}")
+
         except Exception as exception:
+
             self.server_logger.log_error(f"Unexpected exception: {exception}")
+
         finally:
+
+            self.server_logger.log_debug("Closing client socket")
+
             client_socket_.close()

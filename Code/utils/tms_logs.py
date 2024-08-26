@@ -1,8 +1,8 @@
-import os.path
 import sys
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 
 
 class TMSLogger:
@@ -16,6 +16,7 @@ class TMSLogger:
         self.__format = None
         self.__logger = None
         self.__logger_type = logger_type
+        self.is_setup = False
 
     def setup(self) -> bool:
         """
@@ -25,52 +26,70 @@ class TMSLogger:
         Returns: True if set up has been completed successfully, False otherwise.
         """
         try:
-            with open("Code/configs/log_config.json", 'r') as log_config_file:
+            base_path = Path(__file__).resolve().parent.parent
+            config_path = base_path / "configs" / "log_config.json"
+            with open(config_path, 'r') as log_config_file:
                 log_configs = json.loads(log_config_file.read())
-        except OSError:
-            self.log_critical("Could not get LOG configs. Please, check Code/configs/log_config.json file")
+        except OSError as oserror:
+            print(f"Could not get LOG configs. Please, check {config_path} file: {oserror}", file=sys.stderr)
             return False
 
+        key = f"{self.__logger_type}_logs"
+
         try:
-            # Access the appropriate log configuration based on logger type
-            log_config = log_configs[self.__logger_type + "_logs"]
+            log_config = log_configs[key]
             self.__location = log_config["location"]
             self.__level = log_config["level"]
             self.__format = log_config["format"]
         except KeyError as exception:
-            self.log_critical(exception)
+            available_keys = list(log_configs.keys())
+            self._log_critical_root(f"KeyError: {exception}. Available keys: {available_keys}. Requested key: {key}")
             return False
 
-        if not os.path.isdir(self.__location):
+        # Ensure the log directory is set up correctly
+        log_dir_path = Path(base_path) / self.__location
+        log_dir_path = log_dir_path.resolve()  # Normalize the path
+        if not log_dir_path.is_dir():
             try:
-                os.makedirs(self.__location)
-            except OSError:
-                self.log_critical("Could not create cache folder")
+                log_dir_path.mkdir(parents=True, exist_ok=True)
+            except OSError as oserror:
+                self._log_critical_root(f"Could not create cache folder {log_dir_path}: {oserror}")
                 return False
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.join(self.__location, f"logs_{timestamp}.txt")
+        filename = log_dir_path / f"logs_{timestamp}.txt"
 
         # Get corresponding level number by level name
         self.__level = logging.getLevelName(self.__level)
 
         # Configure logger settings with a custom name based on logger type
         self.__logger = logging.getLogger(self.__logger_type)
-        formatter = logging.Formatter(self.__format)
-        file_handler = logging.FileHandler(filename)
-        file_handler.setFormatter(formatter)
-        stream_handler = logging.StreamHandler()
-        stream_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s") # Custom format for stream handler
-        stream_handler.setFormatter(stream_formatter)
 
-        self.__logger.setLevel(self.__level)
-        self.__logger.addHandler(file_handler)
-        self.__logger.addHandler(stream_handler)
+        # Check if the logger already has handlers to prevent duplicate logs
+        if not self.__logger.hasHandlers():
+            formatter = logging.Formatter(self.__format)
+            file_handler = logging.FileHandler(filename)
+            file_handler.setFormatter(formatter)
+            stream_handler = logging.StreamHandler()
+            stream_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            stream_handler.setFormatter(stream_formatter)
 
-        # Disable propagation of debug messages from the root logger to the child logger
-        self.__logger.propagate = False
+            self.__logger.addHandler(file_handler)
+            self.__logger.addHandler(stream_handler)
+            self.__logger.setLevel(self.__level)
+            self.__logger.propagate = False
 
+        self.is_setup = True
         return True
+
+    def _log_critical_root(self, message) -> None:
+        """
+        Log a critical message using the root logger.
+        Args:
+            message: The message to log.
+        Returns: None
+        """
+        logging.critical(message)
 
     def log_critical(self, message) -> None:
         """
@@ -79,8 +98,8 @@ class TMSLogger:
             message: The message to log.
         Returns: None
         """
-        if self.__logger is None:
-            logging.critical("Could not log the message. Please set up TMS logger first.")
+        if not self.is_setup:
+            self._log_critical_root("Logger not set up. Please call setup() first.")
         else:
             self.__logger.critical(message)
 
@@ -91,8 +110,8 @@ class TMSLogger:
             message: The message to log.
         Returns: None
         """
-        if self.__logger is None:
-            logging.critical("Could not log the message. Please set up TMS logger first.")
+        if not self.is_setup:
+            self._log_critical_root("Logger not set up. Please call setup() first.")
         else:
             self.__logger.error(message)
 
@@ -103,8 +122,8 @@ class TMSLogger:
             message: The message to log.
         Returns: None
         """
-        if self.__logger is None:
-            logging.critical("Could not log the message. Please set up TMS logger first.")
+        if not self.is_setup:
+            self._log_critical_root("Logger not set up. Please call setup() first.")
         else:
             self.__logger.info(message)
 
@@ -115,15 +134,18 @@ class TMSLogger:
             message: The message to log.
         Returns: None
         """
-        if self.__logger is None:
-            self.log_critical("Could not log the message. Please set up TMS logger first.")
+        if not self.is_setup:
+            self._log_critical_root("Logger not set up. Please call setup() first.")
         else:
             self.__logger.debug(message)
 
 
 if __name__ == "__main__":
-    server_logger = TMSLogger("server")
-    client_logger = TMSLogger("client")
+    server_logger = TMSLogger("SERVER")
+    client_logger = TMSLogger("CLIENT")
 
     if not server_logger.setup() or not client_logger.setup():
         sys.exit(1)
+
+    client_logger.log_info("Client logger is set up successfully.")
+    server_logger.log_info("Server logger is set up successfully.")

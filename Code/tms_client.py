@@ -1,73 +1,114 @@
 import sys
-import Code
-import threading
-from Code.ui import ui_sign_in_window
-from Code.ui import ui_tms_main_window
-from PyQt6.QtWidgets import QApplication
-from Code.utils.tms_logs import TMSLogger
+import os
+
+# Force APP_MODE to CLIENT
+os.environ['APP_MODE'] = 'client'
+
 import json
+from PyQt6.QtWidgets import QApplication
+from Code.ui.ui_login_window import LoginWindow
+from Code.ui.ui_tms_main_window import TMSMainWindow
+from Code.utils.tms_logs import TMSLogger
 
 
-def thread_run_main_tms_window(*args):
+def get_base_path():
     """
-    This function implements the auxiliary thread intended to launch TMS main window.
-    Args:
-        *args: tuple of input parameters.
+    Returns the base path for the application.
 
-    Returns: None
+    :return: The base path as a string.
+    :rtype: str
     """
+    if getattr(sys, 'frozen', False):
+        # When running as a frozen application (e.g., PyInstaller)
+        return getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    else:
+        # When running in a standard Python environment (e.g., PyCharm)
+        return os.path.dirname(os.path.abspath(__file__))
 
-    try:
-        client_logger = args[0]
-        host = args[1]
-        port = args[2]
-        username = args[3]
-        password = args[4]
 
-        client_logger.log_debug("Main TMS window thread has been launched")
+def get_config_path(config_file):
+    """
+    Constructs the path to the config file.
 
-        app = QApplication(sys.argv)
-        main_window = ui_tms_main_window.TMSMainWindow(client_logger, username, password, host, port)
-        main_window.show()
-        sys.exit(app.exec())
+    :param config_file: The name of the config file.
+    :type config_file: str
+    :return: The absolute path to the config file.
+    :rtype: str
+    """
+    base_path = get_base_path()
 
-    except Exception as exception:
-        client_logger.log_error(f"Error occurred while launching main TMS window: {exception}")
+    # Adjust path based on whether running from PyInstaller or directly
+    if getattr(sys, 'frozen', False):
+        config_path = os.path.join(base_path, 'Code', 'configs', config_file)
+    else:
+        config_path = os.path.join(base_path, 'configs', config_file)
+
+    return config_path
+
+
+class TMSClient:
+    def __init__(self):
+        self.client_logger = TMSLogger("client")
+        if not self.client_logger.setup():
+            sys.exit(1)
+
+        self.client_logger.log_debug("Client logger has been set up successfully")
+
+        # Use the correct function to get the config path
+        tcp_config_path = get_config_path('tcp_config.json')
+        self.client_logger.log_debug(f"TCP config Path: {tcp_config_path}")
+
+        if not os.path.exists(tcp_config_path):
+            self.client_logger.log_critical(f"TCP Config file not found: {tcp_config_path}")
+            sys.exit(1)
+
+        try:
+            with open(tcp_config_path, 'r') as tcp_config_file:
+                tcp_configs = json.load(tcp_config_file)
+        except OSError as e:
+            self.client_logger.log_critical(
+                f"Could not get TCP configs. Please check the file {tcp_config_path}. Error: {e}")
+            sys.exit(1)
+        else:
+            self.client_logger.log_debug("TCP configs have been read successfully")
+
+        try:
+            self.host = tcp_configs["host"]
+            self.port = tcp_configs["port"]
+        except KeyError as exception:
+            self.client_logger.log_error(f"Missing configuration key: {exception}")
+            sys.exit(1)
+        else:
+            self.client_logger.log_debug("TCP configs have been parsed successfully")
+
+        self.app = QApplication(sys.argv)
+        self.login_window = LoginWindow(self.client_logger, self.host, self.port)
+        self.login_window.login_successful.connect(self.on_login_success)
+        self.login_window.show()
+
+    def on_login_success(self, username, password, host, port):
+        """
+        Handles the successful login event by closing the login window and launching the main TMS window.
+
+        Args:
+            username (str): The username entered by the user.
+            password (str): The password entered by the user.
+            host (str): The host address for the TCP connection.
+            port (int): The port number for the TCP connection.
+        """
+        self.client_logger.log_debug("Login was successful, launching main TMS window")
+        self.login_window.close()
+
+        self.main_window = TMSMainWindow(self.client_logger, username, password, host, port)
+        self.main_window.show()
+
+    def run(self):
+        """
+            Starts the Qt application event loop.
+        """
+        sys.exit(self.app.exec())
 
 
 if __name__ == "__main__":
-
-    client_logger = TMSLogger("client")
-    if not client_logger.setup():
-        sys.exit(1)
-
-    client_logger.log_debug("Client logger has been set up successfully")
-
-    try:
-        with open(Code.TCP_CONFIGS, 'r') as tcp_config_file:
-            tcp_configs = json.loads(tcp_config_file.read())
-    except OSError:
-        client_logger.log_critical(f"Could not get TCP configs. Please, check file {Code.TCP_CONFIGS}")
-        sys.exit(1)
-    else:
-        client_logger.log_debug("TCP configs have been read successfully")
-
-    try:
-        host = tcp_configs["host"]
-        port = tcp_configs["port"]
-    except KeyError as exception:
-        client_logger.log_error(exception)
-        sys.exit(1)
-    else:
-        client_logger.log_debug("TCP configs have been parsed successfully")
-
-    run_sign_in_thread = threading.Thread(name="THREAD_RUN_SIGN_IN_WINDOW",
-                                          target=ui_sign_in_window.thread_run_sign_in_window,
-                                          args=(client_logger, host, port))
-    # Launch separate thread THREAD_RUN_SIGN_IN_WINDOW.
-    run_sign_in_thread.start()
-    # Suspend Main thread at this point until THREAD_RUN_SIGN_IN_WINDOW is terminated.
-    run_sign_in_thread.join()
-
-    if ui_sign_in_window.SignInWindow.request_status:
-        ui_sign_in_window.run_main_tms_window(client_logger, host, port, None, None, )
+    tms_client = TMSClient()
+    tms_client.run()

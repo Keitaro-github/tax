@@ -1,45 +1,75 @@
 import os
+import sys
 import sqlite3
 import bcrypt
+from Code.utils import tms_logs
 
 
 class DatabaseServices:
-    """
-    Represents a number of methods to interact with SQLite database.
-
-    Attributes:
-        db_file (str): The path to the SQLite database file.
-        conn: An instance of connection to the database.
-        cursor: An instance of cursor for executing SQL queries.
-    """
-    def __init__(self, db_file):
-        """
-        Initializes a DatabaseServices instance.
-
-        :param db_file: The path to the SQLite database file.
-        :type db_file: str
-        """
+    def __init__(self, db_file=None, tms_logger=None):
         self.db_file = db_file
-        self.conn, self.cursor = self.connect_to_database(db_file)
+        self.app_mode = os.getenv('APP_MODE', 'server').lower()
 
-    @staticmethod
-    def connect_to_database(db_file):
-        """
-        Connects to an SQL database file.
+        if tms_logger is None:
+            logger_type = "server" if self.app_mode == "server" else "client"
+            self.tms_logger = tms_logs.TMSLogger(logger_type)
+            if not self.tms_logger.setup():
+                raise RuntimeError(f"Failed to setup {logger_type} Logger.")
+        else:
+            self.tms_logger = tms_logger
 
-        :param db_file: The path to the SQLite database file.
-        :type db_file: str
-        :return: A tuple containing the connection and cursor to the database.
-        :rtype: tuple (sqlite3.Connection, sqlite3.Cursor)
-        """
-        # Get the absolute path to the directory containing the script
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        # Construct the absolute path to the database file using the script directory
-        db_path = os.path.join(script_dir, db_file)
-        # Connect to the SQLite database
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        return conn, cursor
+        if self.app_mode == 'server':
+            self.tms_logger.log_debug("Initializing in server mode")
+            if self.db_file:
+                self.tms_logger.log_debug(f"DB file provided: {self.db_file}")
+                self.conn, self.cursor = self.connect_to_database()
+            else:
+                raise ValueError("Database file must be specified for server mode.")
+        else:
+            self.tms_logger.log_debug("Initializing in client mode")
+            self.conn = self.cursor = None
+
+    def get_database_path(self):
+        if self.app_mode == 'server':
+            if os.path.isabs(self.db_file):
+                db_path = self.db_file
+            else:
+                if getattr(sys, 'frozen', False):
+                    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+                else:
+                    base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+                # Ensure the 'database' directory is directly appended
+                db_path = os.path.join(base_path, 'database', os.path.basename(self.db_file))
+
+            self.tms_logger.log_debug(f"Base path: {base_path if not os.path.isabs(self.db_file) else ''}")
+            self.tms_logger.log_debug(f"Constructed DB path: {db_path}")
+
+            if not os.path.exists(db_path):
+                self.tms_logger.log_debug(f"File does not exist at: {db_path}")
+            elif not os.access(db_path, os.R_OK):
+                self.tms_logger.log_debug(f"File is not readable at: {db_path}")
+
+            if os.name == 'nt':
+                db_path = db_path.replace('/', '\\')
+
+            return db_path
+        else:
+            return None
+
+    def connect_to_database(self):
+        if self.app_mode == 'server':
+            db_path = self.get_database_path()
+            self.tms_logger.log_debug(f"Connecting to database at: {db_path}")
+            try:
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                return conn, cursor
+            except sqlite3.Error as error:
+                self.tms_logger.log_critical(f"Failed to connect to the database: {error}")
+                raise
+        else:
+            return None, None
 
     def execute_query(self, query, params=None):
         """
@@ -49,9 +79,9 @@ class DatabaseServices:
         :type query: str
         :param params: Parameters for the query.
         :type params: tuple, optional
-        :rtype: None
+        :rtype: list
         """
-        conn, cursor = self.connect_to_database(self.db_file)
+        conn, cursor = self.connect_to_database()
         try:
             if params:
                 cursor.execute(query, params)
@@ -62,9 +92,10 @@ class DatabaseServices:
             conn.commit()
             return result
         except Exception as exception:
-            print("Error executing query:", exception)
+            self.tms_logger.log_critical(f"Error executing query: {exception}")
             # Rollback changes in case of an error
             conn.rollback()
+            return []
         finally:
             conn.close()
 
@@ -166,12 +197,12 @@ class DatabaseServices:
         if date_of_birth:
             query += " AND date_of_birth = ?"
             params.append(date_of_birth)
-
         return self.execute_query(query, params)
 
     def save_to_sql(self, national_id, first_name, last_name, date_of_birth, gender, address_country, address_zip_code,
                     address_city, address_street, address_house_number, phone_country_code, phone_number,
-                    marital_status):
+                    marital_status, tax_rate=None, yearly_income=None, advance_tax=None, tax_paid_this_year=None,
+                    property_value=None, loans=None, property_tax=None):
         """
         Saves user information sent by client to the server into the database.
 
@@ -188,7 +219,7 @@ class DatabaseServices:
         :param address_country: The country of the user's address.
         :type address_country: str
         :param address_zip_code: The zip code of the user's address.
-        :type address_zip_code: int
+        :type address_zip_code: str
         :param address_city: The city of the user's address.
         :type address_city: str
         :param address_street: The street of the user's address.
@@ -201,33 +232,50 @@ class DatabaseServices:
         :type phone_number: int
         :param marital_status: The marital status of the user.
         :type marital_status: str ('Single' or 'Married')
+        :param tax_rate: The tax rate for the user (optional).
+        :type tax_rate: int or None
+        :param yearly_income: The yearly income of the user (optional).
+        :type yearly_income: int or None
+        :param advance_tax: The advance tax paid by the user (optional).
+        :type advance_tax: int or None
+        :param tax_paid_this_year: The tax paid this year by the user (optional).
+        :type tax_paid_this_year: int or None
+        :param property_value: The value of the property owned by the user (optional).
+        :type property_value: int or None
+        :param loans: The amount of loans taken by the user (optional).
+        :type loans: int or None
+        :param property_tax: The property tax of the user (optional).
+        :type property_tax: int or None
         :return: None
         :rtype: None
         """
-        # Construct the SQL INSERT statement
-        queries = [
-            """
-            INSERT INTO personal_info (national_id, first_name, last_name, date_of_birth, gender)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            """             
-            INSERT INTO contact_info (national_id, address_country, address_zip_code, address_city, address_street, 
-            address_house_number, phone_country_code, phone_number)    
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            """         
-            INSERT INTO tax_info (national_id, marital_status)    
-            VALUES (?, ?)
-            """
-        ]
 
-        # Prepare the data for insertion
-        data = [
-            (national_id, first_name, last_name, date_of_birth, gender),
-            (national_id, address_country, address_zip_code, address_city, address_street, address_house_number,
-             phone_country_code, phone_number),
-            (national_id, marital_status)
-        ]
-        # Execute each query separately
-        for query, params in zip(queries, data):
-            self.execute_query(query, params)
+        # SQL INSERT statements for each table
+        try:
+            # Insert into personal_info table
+            personal_info_query = """
+                INSERT INTO personal_info (national_id, first_name, last_name, date_of_birth, gender)
+                VALUES (?, ?, ?, ?, ?)
+            """
+            self.execute_query(personal_info_query, (national_id, first_name, last_name, date_of_birth, gender))
+
+            # Insert into contact_info table
+            contact_info_query = """
+                INSERT INTO contact_info (national_id, address_country, address_zip_code, address_city, address_street,
+                address_house_number, phone_country_code, phone_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            self.execute_query(contact_info_query, (national_id, address_country, address_zip_code, address_city,
+                                                    address_street, address_house_number, phone_country_code,
+                                                    phone_number))
+
+            # Insert into tax_info table with only the provided fields
+            tax_info_query = """
+                INSERT INTO tax_info (national_id, marital_status)
+                VALUES (?, ?)
+            """
+            self.execute_query(tax_info_query, (national_id, marital_status))
+
+            self.tms_logger.log_critical("User data saved successfully.")
+        except Exception as exception:
+            self.tms_logger.log_critical(f"Error saving user data: {exception}")
