@@ -14,16 +14,7 @@ class TMSMainWindow(QWidget):
     """
     Represents the main window of the Tax Management System (TMS) application, created using PyQt6 for user interaction
     with the GUI.
-
-    Attributes:
-        username (str): The username of the TMS user.
-        password (str): The password of the TMS user.
-        host (str): The hostname or IP address of the server to connect to.
-        port (int): The port used by the server for the connection.
-        main_layout (QVBoxLayout): A layout widget for organizing GUI components.
-        user_details_retrieved_signal (pyqtSignal): A signal emitted when user details are retrieved.
     """
-
     user_details_retrieved_signal = pyqtSignal(dict)
 
     def __init__(self, client_logger: TMSLogger, username: str, password: str, host: str, port: int):
@@ -217,10 +208,12 @@ class TMSMainWindow(QWidget):
                 self.label_marital_status.setText(f"Marital status: {user_details['marital_status']}")
 
                 # Format numerical fields with commas, defaulting to empty string if None
-                yearly_income = f"{user_details['yearly_income']:,}" if user_details['yearly_income'] is not None else ''
+                yearly_income = f"{user_details['yearly_income']:,}" if user_details['yearly_income'] is not None \
+                    else ''
                 advance_tax = f"{user_details['advance_tax']:,}" if user_details['advance_tax'] is not None else ''
-                tax_paid_this_year = f"{user_details['tax_paid_this_year']:,}" if user_details[
-                                                                                      'tax_paid_this_year'] is not None else ''
+                tax_paid_this_year = f"{user_details['tax_paid_this_year']:,}" if (user_details[
+                                                                                      'tax_paid_this_year'] is not
+                                                                                   None) else ''
                 property_value = f"{user_details['property_value']:,}" if user_details[
                                                                               'property_value'] is not None else ''
                 loans = f"{user_details['loans']:,}" if user_details['loans'] is not None else ''
@@ -270,14 +263,7 @@ if __name__ == "__main__":
     username = None
     password = None
 
-    # try:
-        # username = sys.argv[1]
-        # password = sys.argv[2]
     main_window = TMSMainWindow(client_logger, username, password, host, port)
-
-    # except IndexError as error:
-    #     client_logger.log_error(f"Unexpected error: {error}")
-    #     main_window = TMSMainWindow(client_logger, None, None, host, port)
 
     main_window.show()
     sys.exit(app.exec())

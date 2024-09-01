@@ -1,11 +1,11 @@
 {
   "client_logs": {
-    "location": "Code/cache/client_logs",
+    "location": "cache/client_logs",
     "level": "DEBUG",
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   },
   "server_logs": {
-    "location": "Code/cache/server_logs",
+    "location": "cache/server_logs",
     "level": "DEBUG",
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   }
