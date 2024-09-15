@@ -91,8 +91,8 @@ class DatabaseServices:
             # Commit changes regardless of type of query
             conn.commit()
             return result
-        except Exception as exception:
-            self.tms_logger.log_critical(f"Error executing query: {exception}")
+        except sqlite3.Error as error:  # Catch database-related errors
+            self.tms_logger.log_critical(f"Error executing query: {query} with params: {params}, Error: {error}")
             # Rollback changes in case of an error
             conn.rollback()
             return []
@@ -254,7 +254,7 @@ class DatabaseServices:
         try:
             # Insert into personal_info table
             personal_info_query = """
-                INSERT INTO personal_info (national_id, first_name, last_name, date_of_birth, gender)
+                INSERT INTO personal_info (national_id, first_name, last_name, date_of_birth, gender) 
                 VALUES (?, ?, ?, ?, ?)
             """
             self.execute_query(personal_info_query, (national_id, first_name, last_name, date_of_birth, gender))
@@ -262,7 +262,7 @@ class DatabaseServices:
             # Insert into contact_info table
             contact_info_query = """
                 INSERT INTO contact_info (national_id, address_country, address_zip_code, address_city, address_street,
-                address_house_number, phone_country_code, phone_number)
+                address_house_number, phone_country_code, phone_number) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
             self.execute_query(contact_info_query, (national_id, address_country, address_zip_code, address_city,
@@ -271,11 +271,11 @@ class DatabaseServices:
 
             # Insert into tax_info table with only the provided fields
             tax_info_query = """
-                INSERT INTO tax_info (national_id, marital_status)
+                INSERT INTO tax_info (national_id, marital_status) 
                 VALUES (?, ?)
             """
             self.execute_query(tax_info_query, (national_id, marital_status))
 
-            self.tms_logger.log_critical("User data saved successfully.")
+            self.tms_logger.log_debug("User data saved successfully.")
         except Exception as exception:
             self.tms_logger.log_critical(f"Error saving user data: {exception}")
