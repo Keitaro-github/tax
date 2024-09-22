@@ -17,6 +17,7 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+
 # Update the sys.path to include the correct module paths
 sys.path.append(resource_path('Code'))
 
@@ -198,13 +199,14 @@ class TCPServer:
         self.server_logger.log_debug(f"Complete data received: {data}")
         return data
 
-    def handle_request(self, client_socket_):
+    def handle_request_match(self, client_socket_):
         """
         Handles incoming requests from the client socket.
         Args:
             client_socket_ (socket.socket): The client socket.
         """
         # time.sleep(3)  # Debug line
+
         user_info_list = []
         try:
             message_data = self.recv_until(client_socket_, b'\r\n').decode().strip()
@@ -223,125 +225,131 @@ class TCPServer:
             self.server_logger.log_debug(f"Command received: {command}")
 
             with db_lock:
-                if command == "login_request":
-                    username = request_data["request"].get("username")
-                    password = request_data["request"].get("password")
-                    if not username or not password:
-                        response = "Username and password must be provided"
-                        client_socket_.sendall(response.encode())
-                        self.server_logger.log_debug("Sent response: 'Username and password must be provided'")
-                        return
+                match command:
 
-                    try:
-                        result = database.check_credentials(username, password)
-                    except Exception as db_error:
-                        self.server_logger.log_error(f"Database error during login: {db_error}")
-                        response = "Server error during login"
-                        client_socket_.sendall(response.encode())
-                        return
+                    case "login_request":
+                        username = request_data["request"].get("username")
+                        password = request_data["request"].get("password")
+                        if not username or not password:
+                            response = "Username and password must be provided"
+                            client_socket_.sendall(response.encode())
+                            self.server_logger.log_debug("Sent response: 'Username and password must be provided'")
+                            return
 
-                    if result:
-                        response = "User logged in successfully"
-                        client_socket_.sendall(response.encode())
-                        self.server_logger.log_debug("Sent response: 'User logged in successfully'")
-                    else:
-                        response = "Invalid username or password"
-                        client_socket_.sendall(response.encode())
-                        self.server_logger.log_debug("Sent response: 'Invalid username or password'")
-                elif command == "save_new_user":
-                    national_id = request_data["request"].get("national_id")
-                    first_name = request_data["request"].get("first_name")
-                    last_name = request_data["request"].get("last_name")
-                    date_of_birth = request_data["request"].get("date_of_birth")
-                    gender = request_data["request"].get("gender")
-                    address_country = request_data["request"].get("address_country")
-                    address_zip_code = request_data["request"].get("address_zip_code")
-                    address_city = request_data["request"].get("address_city")
-                    address_street = request_data["request"].get("address_street")
-                    address_house_number = request_data["request"].get("address_house_number")
-                    phone_country_code = request_data["request"].get("phone_country_code")
-                    phone_number = request_data["request"].get("phone_number")
-                    marital_status = request_data["request"].get("marital_status")
+                        try:
+                            result = database.check_credentials(username, password)
+                        except Exception as db_error:
+                            self.server_logger.log_error(f"Database error during login: {db_error}")
+                            response = "Server error during login"
+                            client_socket_.sendall(response.encode())
+                            return
 
-                    database.save_to_sql(national_id, first_name, last_name, date_of_birth, gender, address_country,
-                                         address_zip_code, address_city, address_street, address_house_number,
-                                         phone_country_code, phone_number, marital_status)
+                        if result:
+                            response = "User logged in successfully"
+                            client_socket_.sendall(response.encode())
+                            self.server_logger.log_debug("Sent response: 'User logged in successfully'")
+                        else:
+                            response = "Invalid username or password"
+                            client_socket_.sendall(response.encode())
+                            self.server_logger.log_debug("Sent response: 'Invalid username or password'")
 
-                    response = {
-                        "status": "success",
-                        "message": "New user saved successfully"
-                    }
-                    client_socket_.sendall(json.dumps(response).encode())
+                    case "save_new_user":
+                        national_id = request_data["request"].get("national_id")
+                        first_name = request_data["request"].get("first_name")
+                        last_name = request_data["request"].get("last_name")
+                        date_of_birth = request_data["request"].get("date_of_birth")
+                        gender = request_data["request"].get("gender")
+                        address_country = request_data["request"].get("address_country")
+                        address_zip_code = request_data["request"].get("address_zip_code")
+                        address_city = request_data["request"].get("address_city")
+                        address_street = request_data["request"].get("address_street")
+                        address_house_number = request_data["request"].get("address_house_number")
+                        phone_country_code = request_data["request"].get("phone_country_code")
+                        phone_number = request_data["request"].get("phone_number")
+                        marital_status = request_data["request"].get("marital_status")
 
-                    self.server_logger.log_debug("Sent response: 'New user saved successfully'")
-                elif command == "find_user":
-                    national_id = request_data["request"].get("national_id")
-                    first_name = request_data["request"].get("first_name")
-                    last_name = request_data["request"].get("last_name")
-                    date_of_birth = request_data["request"].get("date_of_birth")
-                    formatted_date_of_birth = None
-                    if date_of_birth:
-                        formatted_date_of_birth = datetime.datetime.strptime(date_of_birth,
-                                                                             "%d.%m.%Y").strftime("%Y-%m-%d")
-                    search_results = database.search_personal_info(national_id, first_name, last_name,
-                                                                   formatted_date_of_birth)
-                    self.server_logger.log_debug(f"Search results: {search_results}")
-                    if not search_results:
-                        response_data = {"command": "search_unsuccessful"}
-                        response_message = json.dumps(response_data) + "\r\n"
-                        client_socket_.sendall(response_message.encode())
-                    else:
-                        for user in search_results:
-                            limited_user_info = {
-                                "national_id": user[0],
-                                "first_name": user[1],
-                                "last_name": user[2],
-                                "date_of_birth": user[3]
-                            }
-                            user_info_list.append(limited_user_info)
-                            self.server_logger.log_debug(f"Result: {user_info_list}")
-                        response_data = {"command": "search_successful", "user_info": user_info_list}
+                        database.save_to_sql(national_id, first_name, last_name, date_of_birth, gender, address_country,
+                                             address_zip_code, address_city, address_street, address_house_number,
+                                             phone_country_code, phone_number, marital_status)
+
+                        response = {
+                            "status": "success",
+                            "message": "New user saved successfully"
+                        }
+                        client_socket_.sendall(json.dumps(response).encode())
+
+                        self.server_logger.log_debug("Sent response: 'New user saved successfully'")
+
+                    case "find_user":
+                        national_id = request_data["request"].get("national_id")
+                        first_name = request_data["request"].get("first_name")
+                        last_name = request_data["request"].get("last_name")
+                        date_of_birth = request_data["request"].get("date_of_birth")
+                        formatted_date_of_birth = None
+                        if date_of_birth:
+                            formatted_date_of_birth = datetime.datetime.strptime(date_of_birth,
+                                                                                 "%d.%m.%Y").strftime("%Y-%m-%d")
+                        search_results = database.search_personal_info(national_id, first_name, last_name,
+                                                                       formatted_date_of_birth)
+                        self.server_logger.log_debug(f"Search results: {search_results}")
+                        if not search_results:
+                            response_data = {"command": "search_unsuccessful"}
+                            response_message = json.dumps(response_data) + "\r\n"
+                            client_socket_.sendall(response_message.encode())
+                        else:
+                            for user in search_results:
+                                limited_user_info = {
+                                    "national_id": user[0],
+                                    "first_name": user[1],
+                                    "last_name": user[2],
+                                    "date_of_birth": user[3]
+                                }
+                                user_info_list.append(limited_user_info)
+                                self.server_logger.log_debug(f"Result: {user_info_list}")
+                            response_data = {"command": "search_successful", "user_info": user_info_list}
+                            self.server_logger.log_debug(f"Response message sent to client: {response_data}")
+                            response_message = json.dumps(response_data) + "\r\n"
+                            client_socket_.sendall(response_message.encode())
+
+                    case "retrieve_user_details":
+                        national_id = request_data["request"].get("national_id")
+                        search_results = database.retrieve_user_details(national_id)
+                        if not search_results:
+                            response_data = {"command": "retrieving_unsuccessful"}
+                        else:
+                            complete_user_info_list = []
+                            for user_info in search_results:
+                                complete_user_info = {
+                                    "national_id": user_info[0],
+                                    "first_name": user_info[1],
+                                    "last_name": user_info[2],
+                                    "date_of_birth": user_info[3],
+                                    "gender": user_info[4],
+                                    "address_country": user_info[6],
+                                    "address_zip_code": user_info[7],
+                                    "address_city": user_info[8],
+                                    "address_street": user_info[9],
+                                    "address_house_number": user_info[10],
+                                    "phone_country_code": user_info[11],
+                                    "phone_number": user_info[12],
+                                    "marital_status": user_info[14],
+                                    "tax_rate": user_info[15],
+                                    "yearly_income": user_info[16],
+                                    "advance_tax": user_info[17],
+                                    "tax_paid_this_year": user_info[18],
+                                    "property_value": user_info[19],
+                                    "loans": user_info[20],
+                                    "property_tax": user_info[21]
+                                }
+                                complete_user_info_list.append(complete_user_info)
+                                self.server_logger.log_debug(f"Complete_user_info_list: {complete_user_info_list}")
+                            response_data = {"command": "retrieving_successful", "user_info": complete_user_info_list}
                         self.server_logger.log_debug(f"Response message sent to client: {response_data}")
                         response_message = json.dumps(response_data) + "\r\n"
                         client_socket_.sendall(response_message.encode())
-                elif command == "retrieve_user_details":
-                    national_id = request_data["request"].get("national_id")
-                    search_results = database.retrieve_user_details(national_id)
-                    if not search_results:
-                        response_data = {"command": "retrieving_unsuccessful"}
-                    else:
-                        complete_user_info_list = []
-                        for user_info in search_results:
-                            complete_user_info = {
-                                "national_id": user_info[0],
-                                "first_name": user_info[1],
-                                "last_name": user_info[2],
-                                "date_of_birth": user_info[3],
-                                "gender": user_info[4],
-                                "address_country": user_info[6],
-                                "address_zip_code": user_info[7],
-                                "address_city": user_info[8],
-                                "address_street": user_info[9],
-                                "address_house_number": user_info[10],
-                                "phone_country_code": user_info[11],
-                                "phone_number": user_info[12],
-                                "marital_status": user_info[14],
-                                "tax_rate": user_info[15],
-                                "yearly_income": user_info[16],
-                                "advance_tax": user_info[17],
-                                "tax_paid_this_year": user_info[18],
-                                "property_value": user_info[19],
-                                "loans": user_info[20],
-                                "property_tax": user_info[21]
-                            }
-                            complete_user_info_list.append(complete_user_info)
-                            self.server_logger.log_debug(f"Complete_user_info_list: {complete_user_info_list}")
-                        response_data = {"command": "retrieving_successful", "user_info": complete_user_info_list}
-                    self.server_logger.log_debug(f"Response message sent to client: {response_data}")
-                    response_message = json.dumps(response_data) + "\r\n"
-                    client_socket_.sendall(response_message.encode())
-                else:
-                    self.server_logger.log_error(f"Command '{command}' unknown")
+
+                    case _:
+                        self.server_logger.log_error(f"Command '{command}' unknown")
 
         except socket.error as socket_error:
 

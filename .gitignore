@@ -1,0 +1,22 @@
+# Bytecode files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE/editor specific files
+.idea/
+
+# Exclude cache directory
+cache/
+
+# Virtual environment
+venv/
+.env/
+
+# Build artifacts
+dist/
+build/
+
+# Editor swap files
+*.swp

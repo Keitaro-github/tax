@@ -25,6 +25,9 @@ def get_config_path(config_file: Union[str, os.PathLike]) -> str:
     :return: The absolute path to the config file.
     :rtype: str
     """
+    if not isinstance(config_file, (str, os.PathLike)):
+        raise TypeError(f"Expected str or os.PathLike, got {type(config_file).__name__}")
+
     base_path = resource_path('')
 
     # Ensure base_path and config_file are strings
@@ -88,7 +91,7 @@ if __name__ == '__main__':
     while True:
         client_socket, client_address = server.server_socket.accept()
         server_logger.log_debug(f"Connected client: {client_address}")
-        multiple_client_connection_thread = threading.Thread(target=server.handle_request, args=(client_socket,))
+        multiple_client_connection_thread = threading.Thread(target=server.handle_request_match, args=(client_socket,))
         multiple_client_connection_thread.start()
 
     sys.exit(0)
