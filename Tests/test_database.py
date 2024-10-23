@@ -3,7 +3,6 @@ import sqlite3
 from unittest.mock import patch, MagicMock
 from Code.database.database import DatabaseServices
 import os
-import io
 
 
 class TestDatabaseServices(unittest.TestCase):
